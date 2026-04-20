@@ -681,25 +681,40 @@ public sealed class WorkDashboardController : MonoBehaviour
 
         if (dayTransitionPanel == null)
         {
-            var panelGo = new GameObject("DayTransitionPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
-            panelGo.transform.SetParent(floatingPanel, false);
-            dayTransitionPanel = panelGo.transform as RectTransform;
-            dayTransitionPanel.anchorMin = new Vector2(0.5f, 0.5f);
-            dayTransitionPanel.anchorMax = new Vector2(0.5f, 0.5f);
+            // Overlay that dims the whole window and blocks clicks behind it.
+            var overlayGo = new GameObject("DayTransitionPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            overlayGo.transform.SetParent(floatingPanel, false);
+            dayTransitionPanel = overlayGo.transform as RectTransform;
+            dayTransitionPanel.anchorMin = Vector2.zero;
+            dayTransitionPanel.anchorMax = Vector2.one;
             dayTransitionPanel.pivot = new Vector2(0.5f, 0.5f);
-            dayTransitionPanel.sizeDelta = new Vector2(520f, 280f);
+            dayTransitionPanel.offsetMin = Vector2.zero;
+            dayTransitionPanel.offsetMax = Vector2.zero;
 
-            var panelImage = panelGo.GetComponent<Image>();
-            panelImage.color = new Color(0.08f, 0.10f, 0.14f, 0.985f);
-            panelImage.raycastTarget = true;
+            var overlayImg = overlayGo.GetComponent<Image>();
+            overlayImg.color = new Color(0f, 0f, 0f, 0.45f);
+            overlayImg.raycastTarget = true;
 
-            var outline = panelGo.GetComponent<Outline>();
+            // Center card (desktop modal look).
+            var cardGo = new GameObject("Card", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+            cardGo.transform.SetParent(dayTransitionPanel, false);
+            var cardRt = cardGo.transform as RectTransform;
+            cardRt.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRt.pivot = new Vector2(0.5f, 0.5f);
+            cardRt.sizeDelta = new Vector2(560f, 300f);
+
+            var cardImg = cardGo.GetComponent<Image>();
+            cardImg.color = new Color(0.08f, 0.10f, 0.14f, 0.985f);
+            cardImg.raycastTarget = true;
+
+            var outline = cardGo.GetComponent<Outline>();
             outline.effectColor = new Color(0.34f, 0.72f, 1f, 0.35f);
             outline.effectDistance = new Vector2(2f, -2f);
 
             // Header strip to visually match desktop app chrome.
             var headerGo = new GameObject("Header", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            headerGo.transform.SetParent(dayTransitionPanel, false);
+            headerGo.transform.SetParent(cardRt, false);
             var hrt = headerGo.transform as RectTransform;
             hrt.anchorMin = new Vector2(0f, 1f);
             hrt.anchorMax = new Vector2(1f, 1f);
@@ -724,10 +739,13 @@ public sealed class WorkDashboardController : MonoBehaviour
             htmp.raycastTarget = false;
         }
 
+        var card = dayTransitionPanel != null ? dayTransitionPanel.Find("Card") as RectTransform : null;
+        if (card == null) card = dayTransitionPanel; // fallback
+
         if (dayTransitionText == null)
         {
             var textGo = new GameObject("DayTransitionText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            textGo.transform.SetParent(dayTransitionPanel, false);
+            textGo.transform.SetParent(card, false);
             var rt = textGo.transform as RectTransform;
             rt.anchorMin = new Vector2(0f, 0.28f);
             rt.anchorMax = new Vector2(1f, 1f);
@@ -746,7 +764,7 @@ public sealed class WorkDashboardController : MonoBehaviour
         if (dayTransitionProceedButton == null)
         {
             var buttonGo = new GameObject("DayTransitionProceedButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-            buttonGo.transform.SetParent(dayTransitionPanel, false);
+            buttonGo.transform.SetParent(card, false);
             var brt = buttonGo.transform as RectTransform;
             brt.anchorMin = new Vector2(0.5f, 0f);
             brt.anchorMax = new Vector2(0.5f, 0f);

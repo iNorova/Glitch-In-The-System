@@ -4,6 +4,7 @@ using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
+using System.Collections.Generic;
 
 /// <summary>
 /// Ensures Start menu behaves like a desktop menu:
@@ -37,14 +38,13 @@ public sealed class StartMenuController : MonoBehaviour
         if (startMenuPanel == null || !startMenuPanel.activeSelf) return;
         if (!IsPrimaryClickDown()) return;
 
-        var panelRt = startMenuPanel.transform as RectTransform;
-        var startRt = startButton != null ? startButton.transform as RectTransform : null;
-        Vector2 screenPoint = GetPointerPosition();
+        // Important: use UI raycast rather than RectangleContainsScreenPoint.
+        // RectangleContainsScreenPoint needs the correct UI camera and can return false even when clicking inside,
+        // which can close the menu before the button click executes (breaking first-click FL open).
+        if (IsPointerOver(startMenuPanel.transform) || (startButton != null && IsPointerOver(startButton.transform)))
+            return;
 
-        bool insidePanel = panelRt != null && RectTransformUtility.RectangleContainsScreenPoint(panelRt, screenPoint, null);
-        bool insideStart = startRt != null && RectTransformUtility.RectangleContainsScreenPoint(startRt, screenPoint, null);
-        if (!insidePanel && !insideStart)
-            CloseStartMenu();
+        CloseStartMenu();
     }
 
     private void AutoBind()
@@ -159,6 +159,27 @@ public sealed class StartMenuController : MonoBehaviour
 #else
         return Input.mousePosition;
 #endif
+    }
+
+    private static bool IsPointerOver(Transform root)
+    {
+        if (root == null) return false;
+        if (EventSystem.current == null) return false;
+
+        var data = new PointerEventData(EventSystem.current)
+        {
+            position = GetPointerPosition()
+        };
+
+        var results = new List<RaycastResult>(16);
+        EventSystem.current.RaycastAll(data, results);
+        for (int i = 0; i < results.Count; i++)
+        {
+            var t = results[i].gameObject != null ? results[i].gameObject.transform : null;
+            if (t == null) continue;
+            if (t == root || t.IsChildOf(root)) return true;
+        }
+        return false;
     }
 
     /// <summary>
