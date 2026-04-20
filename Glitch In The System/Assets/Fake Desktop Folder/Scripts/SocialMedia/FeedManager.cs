@@ -18,7 +18,8 @@ namespace GlitchInTheSystem.Social
 
             return source
                 .Where(p => p != null && p.isPublished && !p.isRemoved)
-                .OrderByDescending(GetPostSortKey)
+                .OrderByDescending(p => p.feedRank)
+                .ThenByDescending(GetPostSortKey)
                 .ToList();
         }
 
@@ -45,6 +46,10 @@ namespace GlitchInTheSystem.Social
                 sb.Append(p.wasRewrittenByAlgorithm ? 1 : 0);
                 sb.Append(',');
                 sb.Append(p.isRemoved ? 1 : 0);
+                sb.Append(',');
+                sb.Append(p.feedRank);
+                sb.Append(',');
+                sb.Append(p.engagementLabel ?? string.Empty);
                 sb.Append(',');
                 sb.Append(p.commentPreview != null ? p.commentPreview.Count : 0);
                 if (p.commentPreview != null && p.commentPreview.Count > 0)

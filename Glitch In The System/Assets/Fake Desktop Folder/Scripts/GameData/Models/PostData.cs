@@ -39,6 +39,12 @@ namespace GlitchInTheSystem.GameData
         /// <summary>Like count after a decline (usually low — post dies or is buried).</summary>
         public int likesDecline;
 
+        /// <summary>Higher values keep scripted beats (viral → follow-ups) in order; default 0.</summary>
+        public int feedRank;
+
+        /// <summary>Set from like count for feed chips, e.g. TRENDING or LOW ENGAGEMENT.</summary>
+        public string engagementLabel;
+
         public string EngagementDisplay => $"Likes {likes:N0}  •  Shares {shares:N0}  •  Comments {comments:N0}";
     }
 

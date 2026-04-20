@@ -496,6 +496,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
                 }
             };
             posts.Add(post);
+            PostManager.RefreshEngagementLabel(post);
         }
 
         return posts;
@@ -547,6 +548,13 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         var metaRow = CreateHorizontalRow("MetaRow", card.transform as RectTransform, 8);
         CreateTMP("EngagementText", metaRow, post.EngagementDisplay, 14, TextAlignmentOptions.MidlineLeft, new Color(0.76f, 0.83f, 0.97f, 1f));
         CreateTMP("TimeText", metaRow, post.timestampLabel, 14, TextAlignmentOptions.MidlineRight, new Color(0.72f, 0.72f, 0.76f, 1f));
+
+        if (!string.IsNullOrEmpty(post.engagementLabel))
+        {
+            bool trending = string.Equals(post.engagementLabel, "TRENDING", System.StringComparison.Ordinal);
+            var chipColor = trending ? new Color(1f, 0.62f, 0.28f, 1f) : new Color(0.65f, 0.72f, 0.82f, 1f);
+            CreateTMP("EngagementLabel", card.transform as RectTransform, post.engagementLabel, 12, TextAlignmentOptions.MidlineLeft, chipColor);
+        }
 
         string state = BuildStateLabel(post, user);
         if (!string.IsNullOrEmpty(state))

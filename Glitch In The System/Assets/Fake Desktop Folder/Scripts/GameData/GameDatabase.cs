@@ -29,6 +29,9 @@ namespace GlitchInTheSystem.GameData
         private int _queueIndex;
         private readonly System.Random _rng = new();
 
+        /// <summary>Story flags (e.g. whether viral misinformation reached the public feed).</summary>
+        public NarrativeState Narrative { get; } = new NarrativeState();
+
         public IReadOnlyList<UserProfileData> Users => _users;
         public IReadOnlyList<PostData> Posts => _posts;
         public IReadOnlyList<ModerationDecision> Decisions => _decisions;
@@ -62,9 +65,11 @@ namespace GlitchInTheSystem.GameData
             _decisions.Clear();
             _logs.Clear();
             _queueIndex = 0;
+            Narrative.Reset();
 
             int postsToGenerate = config != null ? config.postsPerDay : 10;
             GenerateUsersAndPosts(postsToGenerate);
+            NarrativeFollowUpPosts.RegisterUnpublished(this, _users);
         }
 
         /// <summary>
@@ -111,9 +116,26 @@ namespace GlitchInTheSystem.GameData
                 post.isRemoved = !finalApproved;
                 post.isPublished = finalApproved;
                 PostManager.ApplyDecisionReaction(post, playerChoseApprove, _users);
+
+                if (postId == NarrativeIds.ViralMisinformationPostId)
+                {
+                    post.feedRank = finalApproved ? 100 : 0;
+                    if (Narrative.TryMarkViralResolved(finalApproved))
+                        NarrativeFollowUpPosts.ActivateAfterViralDecision(this, finalApproved, _users);
+                }
             }
 
             AddLog(LogEntryType.PlayerDecision, overriddenByAlgorithm ? "Decision overridden by algorithm" : "Player decision", postId, authorUserId);
+        }
+
+        public PostData GetPostById(string id) => string.IsNullOrEmpty(id) ? null : _posts.FirstOrDefault(p => p.id == id);
+
+        /// <summary>Posts that exist only for the feed / narrative (not in the moderation queue).</summary>
+        public void TryAddNarrativePost(PostData post)
+        {
+            if (post == null || string.IsNullOrEmpty(post.id)) return;
+            if (_posts.Any(p => p.id == post.id)) return;
+            _posts.Add(post);
         }
 
         /// <summary>
@@ -220,6 +242,7 @@ namespace GlitchInTheSystem.GameData
             post.likes = Mathf.Max(0, post.likes + likesDelta);
             post.shares = Mathf.Max(0, post.shares + sharesDelta);
             post.comments = Mathf.Max(0, post.comments + commentsDelta);
+            PostManager.RefreshEngagementLabel(post);
         }
 
         private void GenerateUsersAndPosts(int count)

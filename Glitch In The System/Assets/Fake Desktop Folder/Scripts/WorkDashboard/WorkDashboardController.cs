@@ -218,7 +218,12 @@ public sealed class WorkDashboardController : MonoBehaviour
         }
 
         if (decisionResultText != null)
-            decisionResultText.text = overridden ? $"{(finalApproved ? "Approved" : "Declined")} (overridden)" : (finalApproved ? "Approved" : "Declined");
+        {
+            if (useGameDatabase && _currentDbPost != null)
+                decisionResultText.text = ModerationDecisionFeedback.GetDashboardLine(finalApproved, overridden, _currentDbPost);
+            else
+                decisionResultText.text = overridden ? $"{(finalApproved ? "Approved" : "Declined")} (overridden)" : (finalApproved ? "Approved" : "Declined");
+        }
 
         AppendHistoryEntry(finalApproved, currentPerson, currentPost, overridden);
         currentIndex++;

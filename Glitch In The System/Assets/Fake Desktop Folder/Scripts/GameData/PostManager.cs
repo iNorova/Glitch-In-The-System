@@ -28,6 +28,20 @@ namespace GlitchInTheSystem.GameData
                 post.shares = Mathf.Max(0, DeriveShares(post.likes, playerChoseApprove));
                 post.comments = Mathf.Max(post.commentPreview.Count, DeriveThreadCommentCount(post.likes, playerChoseApprove));
             }
+
+            RefreshEngagementLabel(post);
+        }
+
+        /// <summary>&gt; 100K likes → TRENDING; &lt; 1K → LOW ENGAGEMENT; otherwise cleared.</summary>
+        public static void RefreshEngagementLabel(PostData post)
+        {
+            if (post == null) return;
+            if (post.likes > 100_000)
+                post.engagementLabel = "TRENDING";
+            else if (post.likes < 1000)
+                post.engagementLabel = "LOW ENGAGEMENT";
+            else
+                post.engagementLabel = string.Empty;
         }
 
         private static List<CommentData> BuildCommentPreview(
