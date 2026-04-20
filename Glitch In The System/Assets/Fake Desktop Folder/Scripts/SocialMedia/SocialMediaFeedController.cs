@@ -130,7 +130,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             int rendered = feedContent != null ? feedContent.childCount : 0;
             float w = feedScrollRect != null ? feedScrollRect.GetComponent<RectTransform>().rect.width : 0f;
             float h = feedScrollRect != null ? feedScrollRect.GetComponent<RectTransform>().rect.height : 0f;
-            feedStatsText.text = $"Day {day}  |  Live: {approvedPosts.Count}  |  Feed: {posts.Count}  |  Rendered: {rendered}";
+            string quirk = day == 3 ? "  |  Sync: unstable" : "";
+            feedStatsText.text = $"Day {day}{quirk}  |  Live: {approvedPosts.Count}  |  Feed: {posts.Count}  |  Rendered: {rendered}";
         }
 
         if (feedScrollRect != null)
@@ -488,13 +489,11 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
                 comments = 18 + (i * 9),
                 category = PostCategory.Harmless,
                 severity = 0,
-                isPublished = true,
-                commentPreview = new List<CommentData>
-                {
-                    new CommentData { id = $"dc_{i}_0", postId = $"demo_{i}", authorUserId = "reply_user_a", text = "Nice one!", timestampLabel = "2m", likes = 12 },
-                    new CommentData { id = $"dc_{i}_1", postId = $"demo_{i}", authorUserId = "reply_user_b", text = "Same here, totally agree.", timestampLabel = "1m", likes = 7 }
-                }
+                isPublished = true
             };
+            // Use the same seeded contextual pipeline as real moderated posts.
+            PostManager.AssignDefaultBranches(post, new System.Random(10_000 + i));
+            PostManager.ApplyDecisionReaction(post, playerChoseApprove: true, users: null);
             posts.Add(post);
             PostManager.RefreshEngagementLabel(post);
         }

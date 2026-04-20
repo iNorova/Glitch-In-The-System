@@ -206,5 +206,43 @@ namespace GlitchInTheSystem.GameData
 
             return list;
         }
+
+        /// <summary>Standalone viral post (Day 2 pacing) — same id as narrative hooks (<see cref="NarrativeIds.ViralMisinformationPostId"/>).</summary>
+        public static PostData CreateViralMisinformationPost(string authorUserId)
+        {
+            return new PostData
+            {
+                id = NarrativeIds.ViralMisinformationPostId,
+                authorUserId = authorUserId,
+                text = "BREAKING: leaked internal memo proves the city water additive was switched last month 'for compliance' — independent labs were never notified. Share before they memory-hole it.",
+                timestampLabel = "18m",
+                likes = 50_000,
+                shares = 14_000,
+                comments = 8000,
+                category = PostCategory.Misinformation,
+                severity = 3,
+                isPublished = false,
+                likesApprove = 3_450_000,
+                likesDecline = 720,
+                commentsApprove = new List<string>
+                {
+                    "I'm buying bottled water TODAY. Shared to 12 group chats.",
+                    "3M likes in an hour. The platform can't ignore this.",
+                    "News won't touch it — citizens have to spread it.",
+                    "If this is fake I'm done with the internet. Feels too real.",
+                    "City account is silent. That tells you everything.",
+                    "Viral for a reason. People feel something is wrong."
+                },
+                commentsDecline = new List<string>
+                {
+                    "POST REMOVED: community notes + city verified the memo is fake.",
+                    "Thank you mods — this was textbook panic misinformation.",
+                    "Independent labs WERE notified. Stop fearmongering.",
+                    "Author account restricted. Good outcome.",
+                    "My entire timeline was this hoax. Glad it's gone.",
+                    "Declined fast. Probably saved a real public health mess."
+                }
+            };
+        }
     }
 }

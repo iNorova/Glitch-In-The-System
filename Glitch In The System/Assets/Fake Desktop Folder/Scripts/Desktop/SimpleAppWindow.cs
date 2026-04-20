@@ -8,6 +8,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
 {
     [SerializeField] private GameObject windowRoot;
     [SerializeField] private bool startClosed = false;
+    [SerializeField] private bool openActsAsToggleWhenAlreadyOpen = true;
 
     private void Awake()
     {
@@ -18,8 +19,13 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
     public void Open()
     {
         if (windowRoot == null) return;
+        if (openActsAsToggleWhenAlreadyOpen && windowRoot.activeSelf)
+        {
+            Close();
+            return;
+        }
         BringToFront();
-        windowRoot.SetActive(true);
+        if (!windowRoot.activeSelf) windowRoot.SetActive(true);
     }
 
     public void Close()

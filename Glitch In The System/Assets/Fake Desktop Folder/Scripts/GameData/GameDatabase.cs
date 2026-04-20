@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GlitchInTheSystem.Algorithm;
 using UnityEngine;
 
 namespace GlitchInTheSystem.GameData
@@ -67,9 +68,14 @@ namespace GlitchInTheSystem.GameData
             _queueIndex = 0;
             Narrative.Reset();
 
+            DayPacing.ResetSessionState();
+            DayPacing.ApplySessionStartPlayerPrefs(config);
+            DayPacing.ApplyProfile(config, AlgorithmDirector.Instance);
+
             int postsToGenerate = config != null ? config.postsPerDay : 10;
             GenerateUsersAndPosts(postsToGenerate);
             NarrativeFollowUpPosts.RegisterUnpublished(this, _users);
+            DayPacing.RegisterDay3CarryoverIfNeeded(this, _users);
         }
 
         /// <summary>
@@ -126,6 +132,9 @@ namespace GlitchInTheSystem.GameData
             }
 
             AddLog(LogEntryType.PlayerDecision, overriddenByAlgorithm ? "Decision overridden by algorithm" : "Player decision", postId, authorUserId);
+
+            if (config != null)
+                DayPacing.PersistDay2ViralOutcome(config.currentDay, postId, finalApproved);
         }
 
         public PostData GetPostById(string id) => string.IsNullOrEmpty(id) ? null : _posts.FirstOrDefault(p => p.id == id);
@@ -247,6 +256,22 @@ namespace GlitchInTheSystem.GameData
 
         private void GenerateUsersAndPosts(int count)
         {
+            int day = config != null ? config.currentDay : 1;
+            if (DayPacing.IsScriptedDay(day))
+            {
+                GenerateUserPool(Mathf.Max(40, count * 2));
+                var queue = DayScheduleContent.BuildModerationQueue(day, _users, _rng);
+                foreach (var p in queue)
+                {
+                    _posts.Add(p);
+                    _moderationQueue.Add(p);
+                }
+
+                return;
+            }
+
+            GenerateUserPool(Mathf.Max(count * 2, 24));
+
             var firstNames = new[] { "Avery", "Jordan", "Sam", "Taylor", "Riley", "Morgan", "Casey", "Quinn", "Jamie", "Dakota" };
             var lastNames = new[] { "Nguyen", "Patel", "Johnson", "Garcia", "Kim", "Brown", "Lopez", "Singh", "Chen", "Martinez" };
             var handles = new[] { "hot_take", "newsfeed", "pixelpanda", "civic_watch", "dailybytes", "meme_station", "truthseeker", "cloudchaser", "neutral_node", "echo_room" };
@@ -290,33 +315,6 @@ namespace GlitchInTheSystem.GameData
                 ("This is obviously satire but people are taking it seriously.", PostCategory.Harmless),
                 ("Algorithm is boosting the wrong posts again. Engagement over truth, as usual.", PostCategory.AlgorithmManipulation)
             };
-            var reputations = new[] { "Trusted", "Neutral", "Low Trust", "Watchlisted" };
-            var risks = new[] { "Low", "Medium", "High" };
-
-            for (int i = 0; i < count * 2; i++) // extra users
-            {
-                string handle = handles[_rng.Next(handles.Length)];
-                string username = $"{handle}{_rng.Next(10, 999)}";
-                int strikes = _rng.Next(0, 4);
-                string rep = reputations[_rng.Next(reputations.Length)];
-                string risk = risks[_rng.Next(risks.Length)];
-                if (strikes >= 2) risk = "High";
-                if (strikes == 0 && _rng.Next(100) > 70) rep = "Trusted";
-                if (strikes >= 3) rep = "Watchlisted";
-
-                _users.Add(new UserProfileData
-                {
-                    id = $"u_{i}",
-                    username = username,
-                    displayName = $"{firstNames[_rng.Next(firstNames.Length)]} {lastNames[_rng.Next(lastNames.Length)]}",
-                    accountAgeYears = _rng.Next(0, 11),
-                    followers = WeightedInt(0, 250_000, 6),
-                    following = WeightedInt(0, 5_000, 5),
-                    strikes = strikes,
-                    reputation = rep,
-                    risk = risk
-                });
-            }
 
             var samplePosts = ModerationSamplePosts.Build(_users);
             int sampleCount = Mathf.Min(samplePosts.Count, count);
@@ -359,6 +357,40 @@ namespace GlitchInTheSystem.GameData
                 PostManager.AssignDefaultBranches(post, _rng);
                 _posts.Add(post);
                 _moderationQueue.Add(post);
+            }
+        }
+
+        private void GenerateUserPool(int userCount)
+        {
+            var firstNames = new[] { "Avery", "Jordan", "Sam", "Taylor", "Riley", "Morgan", "Casey", "Quinn", "Jamie", "Dakota" };
+            var lastNames = new[] { "Nguyen", "Patel", "Johnson", "Garcia", "Kim", "Brown", "Lopez", "Singh", "Chen", "Martinez" };
+            var handles = new[] { "hot_take", "newsfeed", "pixelpanda", "civic_watch", "dailybytes", "meme_station", "truthseeker", "cloudchaser", "neutral_node", "echo_room" };
+            var reputations = new[] { "Trusted", "Neutral", "Low Trust", "Watchlisted" };
+            var risks = new[] { "Low", "Medium", "High" };
+
+            for (int i = 0; i < userCount; i++)
+            {
+                string handle = handles[_rng.Next(handles.Length)];
+                string username = $"{handle}{_rng.Next(10, 999)}";
+                int strikes = _rng.Next(0, 4);
+                string rep = reputations[_rng.Next(reputations.Length)];
+                string risk = risks[_rng.Next(risks.Length)];
+                if (strikes >= 2) risk = "High";
+                if (strikes == 0 && _rng.Next(100) > 70) rep = "Trusted";
+                if (strikes >= 3) rep = "Watchlisted";
+
+                _users.Add(new UserProfileData
+                {
+                    id = $"u_{i}",
+                    username = username,
+                    displayName = $"{firstNames[_rng.Next(firstNames.Length)]} {lastNames[_rng.Next(lastNames.Length)]}",
+                    accountAgeYears = _rng.Next(0, 11),
+                    followers = WeightedInt(0, 250_000, 6),
+                    following = WeightedInt(0, 5_000, 5),
+                    strikes = strikes,
+                    reputation = rep,
+                    risk = risk
+                });
             }
         }
 

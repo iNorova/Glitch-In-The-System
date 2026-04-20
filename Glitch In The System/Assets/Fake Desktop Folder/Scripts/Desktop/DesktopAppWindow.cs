@@ -8,6 +8,7 @@ public sealed class DesktopAppWindow : MonoBehaviour, IPointerDownHandler, IBegi
 {
     [SerializeField] private GameObject windowRoot;
     [SerializeField] private bool startClosed = true;
+    [SerializeField] private bool openActsAsToggleWhenAlreadyOpen = true;
     [SerializeField] private WorkDashboardController workDashboardController;
 
     private void Awake()
@@ -19,9 +20,14 @@ public sealed class DesktopAppWindow : MonoBehaviour, IPointerDownHandler, IBegi
     public void Open()
     {
         if (windowRoot == null) return;
+        if (openActsAsToggleWhenAlreadyOpen && windowRoot.activeSelf)
+        {
+            Close();
+            return;
+        }
         BringToFront();
-        windowRoot.SetActive(true);
-        if (workDashboardController != null) workDashboardController.StartSession();
+        // Let panel OnEnable drive session init to avoid double-StartSession races.
+        if (!windowRoot.activeSelf) windowRoot.SetActive(true);
     }
 
     public void Close()

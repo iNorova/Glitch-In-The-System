@@ -38,6 +38,11 @@ public sealed class WorkDashboardController : MonoBehaviour
     [SerializeField] private Button declineButton;
     [SerializeField] private TMP_Text decisionResultText;
 
+    [Header("Day transition")]
+    [SerializeField] private RectTransform dayTransitionPanel;
+    [SerializeField] private TMP_Text dayTransitionText;
+    [SerializeField] private Button dayTransitionProceedButton;
+
     [Header("Decision history")]
     [Tooltip("Content transform under a ScrollRect where entries will be appended.")]
     [SerializeField] private RectTransform decisionHistoryContent;
@@ -56,6 +61,8 @@ public sealed class WorkDashboardController : MonoBehaviour
     // When using GameDatabase, we hold refs to the actual data for recording
     private UserProfileData _currentDbUser;
     private PostData _currentDbPost;
+    private int _pendingCompletedDay = -1;
+    private int _pendingNextDay = -1;
 
     private readonly System.Random rng = new();
 
@@ -131,6 +138,7 @@ public sealed class WorkDashboardController : MonoBehaviour
     {
         AutoBindByName();
         WireButtonsIfPresent();
+        HideDayTransitionPanel();
 
         if (useGameDatabase && GameDatabase.Instance != null)
         {
@@ -150,8 +158,20 @@ public sealed class WorkDashboardController : MonoBehaviour
                 return;
             }
 
-            // Fresh session
+            // If the day is already completed, advance to next day once, then load the next queue.
+            // This prevents the "0/9 again" bug when re-opening the panel after finishing.
+            if (GameDatabase.Instance.Posts.Count > 0 && GameDatabase.Instance.GetDecisionsCount() >= postsPerSession)
+            {
+                int nextDay = dayNumber + 1;
+                _pendingCompletedDay = dayNumber;
+                _pendingNextDay = nextDay;
+                ShowDayTransitionPanel(_pendingCompletedDay, _pendingNextDay);
+                return;
+            }
+
             GameDatabase.Instance.InitializeSession();
+            postsPerSession = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.postsPerDay : postsPerSession;
+            dayNumber = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.currentDay : dayNumber;
             currentIndex = 0;
             AlgorithmNotification.Instance?.Show(AlgorithmVoice.QueueLoaded(postsPerSession, dayNumber));
         }
@@ -175,6 +195,54 @@ public sealed class WorkDashboardController : MonoBehaviour
         ApplyFontMultiplier();
         if (!EnsureReady()) return;
         UpdateTopBar();
+        Next();
+    }
+
+    private void ShowDayTransitionPanel(int completedDay, int nextDay)
+    {
+        EnsureDayTransitionPanel();
+        if (dayTransitionPanel == null) return;
+
+        if (dayTransitionText != null)
+            dayTransitionText.text = $"<size=34><b>DAY {completedDay} COMPLETE</b></size>\n\nYou reviewed all queued posts for Day {completedDay}.\nPress <b>Proceed</b> to start Day {nextDay}.";
+
+        dayTransitionPanel.gameObject.SetActive(true);
+    }
+
+    private void HideDayTransitionPanel()
+    {
+        if (dayTransitionPanel != null)
+            dayTransitionPanel.gameObject.SetActive(false);
+    }
+
+    private void ProceedToNextDay()
+    {
+        if (!useGameDatabase || GameDatabase.Instance == null)
+        {
+            HideDayTransitionPanel();
+            return;
+        }
+
+        if (GameManager.Instance != null) GameManager.Instance.AdvanceToNextDay();
+        else if (GameDatabase.Instance.Config != null) GameDatabase.Instance.Config.currentDay += 1;
+
+        GameDatabase.Instance.InitializeSession();
+        postsPerSession = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.postsPerDay : postsPerSession;
+        dayNumber = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.currentDay : dayNumber;
+        currentIndex = 0;
+
+        if (decisionResultText != null) decisionResultText.text = "—";
+        ApplyFontMultiplier();
+        if (!EnsureReady()) return;
+        UpdateTopBar();
+        HideDayTransitionPanel();
+
+        if (_pendingCompletedDay > 0 && _pendingNextDay > 0)
+            AlgorithmNotification.Instance?.Show($"> Day {_pendingCompletedDay} ended. Loading Day {_pendingNextDay}...");
+        _pendingCompletedDay = -1;
+        _pendingNextDay = -1;
+
+        AlgorithmNotification.Instance?.Show(AlgorithmVoice.QueueLoaded(postsPerSession, dayNumber));
         Next();
     }
 
@@ -471,6 +539,7 @@ public sealed class WorkDashboardController : MonoBehaviour
         approveButton ??= FindButton("ApproveButton");
         declineButton ??= FindButton("DeclineButton");
         decisionResultText ??= FindTMP("DecisionResultText");
+        dayTransitionText ??= FindTMP("DayTransitionText");
 
         decisionHistoryContent ??= FindRect("FloatingPanel/Body/RightPanel/DecisionHistory/Scroll/Viewport/Content");
         decisionHistoryContent ??= FindRect("Body/RightPanel/DecisionHistory/Scroll/Viewport/Content");
@@ -479,6 +548,10 @@ public sealed class WorkDashboardController : MonoBehaviour
 
         decisionHistoryScrollRect ??= FindScrollRect("Scroll");
         decisionHistoryScrollRect ??= FindScrollRect("DecisionHistory");
+
+        dayTransitionPanel ??= FindRect("FloatingPanel/DayTransitionPanel");
+        dayTransitionPanel ??= FindRect("DayTransitionPanel");
+        dayTransitionProceedButton ??= FindButton("DayTransitionProceedButton");
     }
 
     private TMP_Text FindTMP(string name)
@@ -547,6 +620,12 @@ public sealed class WorkDashboardController : MonoBehaviour
             declineButton.onClick.RemoveAllListeners();
             declineButton.onClick.AddListener(Decline);
         }
+
+        if (dayTransitionProceedButton != null)
+        {
+            dayTransitionProceedButton.onClick.RemoveAllListeners();
+            dayTransitionProceedButton.onClick.AddListener(ProceedToNextDay);
+        }
     }
 
     private void LogMissingBindingsOnce()
@@ -589,6 +668,114 @@ public sealed class WorkDashboardController : MonoBehaviour
         var focus = panel.GetComponent<WindowFocusOnClick>();
         if (focus == null) focus = panel.gameObject.AddComponent<WindowFocusOnClick>();
         focus.SetTarget(root);
+    }
+
+    private void EnsureDayTransitionPanel()
+    {
+        AutoBindByName();
+        if (dayTransitionPanel != null && dayTransitionText != null && dayTransitionProceedButton != null) return;
+
+        var floatingPanel = transform.Find("FloatingPanel") as RectTransform;
+        if (floatingPanel == null) floatingPanel = transform as RectTransform;
+        if (floatingPanel == null) return;
+
+        if (dayTransitionPanel == null)
+        {
+            var panelGo = new GameObject("DayTransitionPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+            panelGo.transform.SetParent(floatingPanel, false);
+            dayTransitionPanel = panelGo.transform as RectTransform;
+            dayTransitionPanel.anchorMin = new Vector2(0.5f, 0.5f);
+            dayTransitionPanel.anchorMax = new Vector2(0.5f, 0.5f);
+            dayTransitionPanel.pivot = new Vector2(0.5f, 0.5f);
+            dayTransitionPanel.sizeDelta = new Vector2(520f, 280f);
+
+            var panelImage = panelGo.GetComponent<Image>();
+            panelImage.color = new Color(0.08f, 0.10f, 0.14f, 0.985f);
+            panelImage.raycastTarget = true;
+
+            var outline = panelGo.GetComponent<Outline>();
+            outline.effectColor = new Color(0.34f, 0.72f, 1f, 0.35f);
+            outline.effectDistance = new Vector2(2f, -2f);
+
+            // Header strip to visually match desktop app chrome.
+            var headerGo = new GameObject("Header", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            headerGo.transform.SetParent(dayTransitionPanel, false);
+            var hrt = headerGo.transform as RectTransform;
+            hrt.anchorMin = new Vector2(0f, 1f);
+            hrt.anchorMax = new Vector2(1f, 1f);
+            hrt.pivot = new Vector2(0.5f, 1f);
+            hrt.sizeDelta = new Vector2(0f, 42f);
+            hrt.anchoredPosition = Vector2.zero;
+            var himg = headerGo.GetComponent<Image>();
+            himg.color = new Color(0.12f, 0.16f, 0.22f, 1f);
+
+            var headerLabel = new GameObject("HeaderLabel", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            headerLabel.transform.SetParent(headerGo.transform, false);
+            var hlrt = headerLabel.transform as RectTransform;
+            hlrt.anchorMin = Vector2.zero;
+            hlrt.anchorMax = Vector2.one;
+            hlrt.offsetMin = new Vector2(16f, 0f);
+            hlrt.offsetMax = new Vector2(-16f, 0f);
+            var htmp = headerLabel.GetComponent<TextMeshProUGUI>();
+            htmp.text = "WORK DASHBOARD — DAY TRANSITION";
+            htmp.fontSize = 16;
+            htmp.alignment = TextAlignmentOptions.MidlineLeft;
+            htmp.color = new Color(0.80f, 0.90f, 1f, 1f);
+            htmp.raycastTarget = false;
+        }
+
+        if (dayTransitionText == null)
+        {
+            var textGo = new GameObject("DayTransitionText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(dayTransitionPanel, false);
+            var rt = textGo.transform as RectTransform;
+            rt.anchorMin = new Vector2(0f, 0.28f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.offsetMin = new Vector2(26f, 12f);
+            rt.offsetMax = new Vector2(-26f, -54f);
+
+            var tmp = textGo.GetComponent<TextMeshProUGUI>();
+            tmp.text = "Day ended.";
+            tmp.fontSize = 24;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = new Color(0.93f, 0.95f, 0.99f, 1f);
+            tmp.textWrappingMode = TextWrappingModes.Normal;
+            dayTransitionText = tmp;
+        }
+
+        if (dayTransitionProceedButton == null)
+        {
+            var buttonGo = new GameObject("DayTransitionProceedButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            buttonGo.transform.SetParent(dayTransitionPanel, false);
+            var brt = buttonGo.transform as RectTransform;
+            brt.anchorMin = new Vector2(0.5f, 0f);
+            brt.anchorMax = new Vector2(0.5f, 0f);
+            brt.pivot = new Vector2(0.5f, 0f);
+            brt.anchoredPosition = new Vector2(0f, 24f);
+            brt.sizeDelta = new Vector2(220f, 50f);
+
+            var bImg = buttonGo.GetComponent<Image>();
+            bImg.color = new Color(0.20f, 0.58f, 0.30f, 1f);
+
+            dayTransitionProceedButton = buttonGo.GetComponent<Button>();
+
+            var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            labelGo.transform.SetParent(buttonGo.transform, false);
+            var lrt = labelGo.transform as RectTransform;
+            lrt.anchorMin = Vector2.zero;
+            lrt.anchorMax = Vector2.one;
+            lrt.offsetMin = Vector2.zero;
+            lrt.offsetMax = Vector2.zero;
+            var ltmp = labelGo.GetComponent<TextMeshProUGUI>();
+            ltmp.text = "Proceed";
+            ltmp.fontSize = 22;
+            ltmp.alignment = TextAlignmentOptions.Center;
+            ltmp.color = Color.white;
+            ltmp.raycastTarget = false;
+        }
+
+        dayTransitionPanel.SetAsLastSibling();
+        WireButtonsIfPresent();
     }
 
     [Serializable]

@@ -35,6 +35,16 @@ namespace GlitchInTheSystem.Algorithm
 
         private readonly System.Random _rng = new();
 
+        // Inspector defaults (scripted days mutate chances; restore when day >= 4).
+        private float _defaultO0, _defaultO1, _defaultO2, _defaultR0, _defaultR1, _defaultR2;
+
+        /// <summary>Call after scripted pacing so day 4+ uses scene/inspector tuning again.</summary>
+        public void RestoreDefaultInterferenceFromInspector()
+        {
+            SetOverrideChances(_defaultO0, _defaultO1, _defaultO2);
+            SetRewriteChances(_defaultR0, _defaultR1, _defaultR2);
+        }
+
         public int Phase
         {
             get => phase;
@@ -45,6 +55,20 @@ namespace GlitchInTheSystem.Algorithm
         public bool IsAuthoritative => phase == 1;
         public bool IsManipulative => phase == 2;
 
+        public void SetOverrideChances(float phase0, float phase1, float phase2)
+        {
+            overrideChancePhase0 = phase0;
+            overrideChancePhase1 = phase1;
+            overrideChancePhase2 = phase2;
+        }
+
+        public void SetRewriteChances(float phase0, float phase1, float phase2)
+        {
+            rewriteChancePhase0 = phase0;
+            rewriteChancePhase1 = phase1;
+            rewriteChancePhase2 = phase2;
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -53,6 +77,13 @@ namespace GlitchInTheSystem.Algorithm
                 return;
             }
             Instance = this;
+
+            _defaultO0 = overrideChancePhase0;
+            _defaultO1 = overrideChancePhase1;
+            _defaultO2 = overrideChancePhase2;
+            _defaultR0 = rewriteChancePhase0;
+            _defaultR1 = rewriteChancePhase1;
+            _defaultR2 = rewriteChancePhase2;
         }
 
         private void OnDestroy()
@@ -67,6 +98,19 @@ namespace GlitchInTheSystem.Algorithm
         /// </summary>
         public (bool approved, bool overridden, string reason) ProcessDecision(string postId, string authorUserId, bool playerApproved, PostData post = null)
         {
+            if (DayPacing.TryConsumeDay3ForcedOverride(playerApproved, post, out bool forcedApproved, out string forcedReason))
+            {
+                if (GameDatabase.Instance != null)
+                {
+                    GameDatabase.Instance.AddLog(LogEntryType.AlgorithmOverride,
+                        $"Forced Day 3 override: Player chose {(playerApproved ? "Approve" : "Decline")}, Algorithm enforced {(forcedApproved ? "Approve" : "Decline")}. {forcedReason}",
+                        postId, authorUserId, $"{playerApproved},{forcedApproved}");
+                }
+
+                AlgorithmNotification.Instance?.Show($"> {forcedReason}", 4f);
+                return (forcedApproved, true, forcedReason);
+            }
+
             float overrideChance = phase switch
             {
                 0 => overrideChancePhase0,
