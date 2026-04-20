@@ -12,6 +12,8 @@ namespace GlitchInTheSystem.GameData
         public string postId;
         public string authorUserId;
         public bool approved;
+        /// <summary>What the player clicked before any algorithm override.</summary>
+        public bool playerChoseApprove;
         public bool wasOverriddenByAlgorithm;
         public string playerReason;   // optional: why player chose
         public string algorithmReason; // if overridden

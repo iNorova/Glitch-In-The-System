@@ -90,13 +90,14 @@ namespace GlitchInTheSystem.GameData
         /// <summary>
         /// Record a moderation decision. AlgorithmDirector may override before this is applied.
         /// </summary>
-        public void RecordDecision(string postId, string authorUserId, bool approved, bool overriddenByAlgorithm = false, string reason = null)
+        public void RecordDecision(string postId, string authorUserId, bool finalApproved, bool playerChoseApprove, bool overriddenByAlgorithm = false, string reason = null)
         {
             var decision = new ModerationDecision
             {
                 postId = postId,
                 authorUserId = authorUserId,
-                approved = approved,
+                approved = finalApproved,
+                playerChoseApprove = playerChoseApprove,
                 wasOverriddenByAlgorithm = overriddenByAlgorithm,
                 algorithmReason = overriddenByAlgorithm ? reason : null,
                 playerReason = overriddenByAlgorithm ? null : reason,
@@ -107,8 +108,9 @@ namespace GlitchInTheSystem.GameData
             var post = _posts.FirstOrDefault(p => p.id == postId);
             if (post != null)
             {
-                post.isRemoved = !approved;
-                post.isPublished = approved;
+                post.isRemoved = !finalApproved;
+                post.isPublished = finalApproved;
+                PostManager.ApplyDecisionReaction(post, playerChoseApprove, _users);
             }
 
             AddLog(LogEntryType.PlayerDecision, overriddenByAlgorithm ? "Decision overridden by algorithm" : "Player decision", postId, authorUserId);
@@ -293,7 +295,15 @@ namespace GlitchInTheSystem.GameData
                 });
             }
 
-            for (int i = 0; i < count; i++)
+            var samplePosts = ModerationSamplePosts.Build(_users);
+            int sampleCount = Mathf.Min(samplePosts.Count, count);
+            for (int s = 0; s < sampleCount; s++)
+            {
+                _posts.Add(samplePosts[s]);
+                _moderationQueue.Add(samplePosts[s]);
+            }
+
+            for (int i = sampleCount; i < count; i++)
             {
                 var author = _users[_rng.Next(_users.Count)];
                 var (text, category) = postTemplates[_rng.Next(postTemplates.Length)];
@@ -323,100 +333,10 @@ namespace GlitchInTheSystem.GameData
                     severity = severity,
                     isPublished = false
                 };
-                post.commentPreview = GenerateCommentPreview(post, maxCount: _rng.Next(2, 6));
+                PostManager.AssignDefaultBranches(post, _rng);
                 _posts.Add(post);
                 _moderationQueue.Add(post);
             }
-        }
-
-        private List<CommentData> GenerateCommentPreview(PostData post, int maxCount)
-        {
-            var result = new List<CommentData>();
-            if (post == null || _users.Count == 0 || maxCount <= 0) return result;
-
-            var templates = CommentTemplatesFor(post);
-            if (templates.Length == 0) return result;
-
-            int count = Mathf.Clamp(maxCount, 1, 6);
-            for (int i = 0; i < count; i++)
-            {
-                var commenter = _users[_rng.Next(_users.Count)];
-                string text = templates[_rng.Next(templates.Length)];
-                result.Add(new CommentData
-                {
-                    id = $"c_{post.id}_{i}",
-                    postId = post.id,
-                    authorUserId = commenter.id,
-                    text = text,
-                    timestampLabel = $"{_rng.Next(1, 58)}m",
-                    likes = WeightedInt(0, 800, 4),
-                    isHidden = false
-                });
-            }
-            return result;
-        }
-
-        private static string[] CommentTemplatesFor(PostData post)
-        {
-            if (post == null) return Array.Empty<string>();
-
-            string text = (post.originalText ?? post.text ?? "").ToLowerInvariant();
-            if (text.Contains("election") || text.Contains("vote") || text.Contains("politician") || text.Contains("rigging"))
-            {
-                return new[]
-                {
-                    "This is exactly what they don't want us to see.",
-                    "Where's the source? This feels fake.",
-                    "I saw the same thing on two other pages.",
-                    "People will call this conspiracy but it's obvious.",
-                    "Can we get verified links before everyone shares this?"
-                };
-            }
-
-            if (text.Contains("dead") || text.Contains("passed") || text.Contains("rip") || text.Contains("death"))
-            {
-                return new[]
-                {
-                    "If this is true this is heartbreaking.",
-                    "Stop spreading this until it's confirmed.",
-                    "I checked and some pages say it's a hoax.",
-                    "This is why misinformation is dangerous.",
-                    "Prayers for everyone involved."
-                };
-            }
-
-            if (text.Contains("vaccine") || text.Contains("cure") || text.Contains("pharma") || text.Contains("cancer"))
-            {
-                return new[]
-                {
-                    "Medical claims need real evidence.",
-                    "My family believes this too, not sure anymore.",
-                    "Please don't post health advice without sources.",
-                    "Big topic, people are going to fight in comments.",
-                    "This kind of post goes viral every week."
-                };
-            }
-
-            if (text.Contains("scam") || text.Contains("gofundme") || text.Contains("fake charity"))
-            {
-                return new[]
-                {
-                    "Reported. This looks like a scam.",
-                    "Thanks for warning people.",
-                    "I almost donated, wow.",
-                    "Account needs to be banned.",
-                    "Please pin this for visibility."
-                };
-            }
-
-            return new[]
-            {
-                "Not sure what to think about this one.",
-                "People are sharing this everywhere right now.",
-                "This app is wild today.",
-                "Can someone fact-check this please?",
-                "This is going to trend."
-            };
         }
 
         private int WeightedInt(int min, int max, int power)

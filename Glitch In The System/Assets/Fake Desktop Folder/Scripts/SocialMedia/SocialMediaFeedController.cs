@@ -1,13 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using GlitchInTheSystem.GameData;
+using GlitchInTheSystem.Social;
 using GlitchInTheSystem.UI;
 
 /// <summary>
@@ -114,19 +113,12 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (autoInitializeSessionIfEmpty && GameDatabase.Instance.Posts.Count == 0)
             GameDatabase.Instance.InitializeSession();
 
-        IReadOnlyList<PostData> source = includeRemovedPosts
-            ? GameDatabase.Instance.Posts
-            : GameDatabase.Instance.GetFeedPosts();
-
-        var approvedPosts = source
-            .Where(p => p != null && p.isPublished && !p.isRemoved)
-            .OrderByDescending(GetPostSortKey)
-            .ToList();
+        var approvedPosts = FeedManager.GetPublishedPostsForFeed(GameDatabase.Instance, includeRemovedPosts);
         var posts = BuildDisplayFeed(approvedPosts);
 
         EnsureFeedLayout();
 
-        string signature = BuildSignature(posts);
+        string signature = FeedManager.BuildSignature(posts);
         if (!force && signature == _lastSignature) return;
         _lastSignature = signature;
 
@@ -658,34 +650,6 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         tmp.alignment = align;
         tmp.raycastTarget = false;
         return tmp;
-    }
-
-    private static string BuildSignature(IReadOnlyList<PostData> posts)
-    {
-        int count = posts.Count;
-        int likes = 0, shares = 0, comments = 0, rewritten = 0, removed = 0;
-        for (int i = 0; i < posts.Count; i++)
-        {
-            likes += posts[i].likes;
-            shares += posts[i].shares;
-            comments += posts[i].comments;
-            if (posts[i].wasRewrittenByAlgorithm) rewritten++;
-            if (posts[i].isRemoved) removed++;
-        }
-        return $"{count}|{likes}|{shares}|{comments}|{rewritten}|{removed}";
-    }
-
-    private static int GetPostSortKey(PostData post)
-    {
-        if (post == null || string.IsNullOrEmpty(post.id)) return 0;
-        int idx = post.id.LastIndexOf('_');
-        if (idx >= 0 && idx + 1 < post.id.Length)
-        {
-            string tail = post.id.Substring(idx + 1);
-            if (int.TryParse(tail, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n))
-                return n;
-        }
-        return 0;
     }
 
     private static string BuildStateLabel(PostData post, UserProfileData user)

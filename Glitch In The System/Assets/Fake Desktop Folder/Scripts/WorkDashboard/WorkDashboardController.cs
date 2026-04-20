@@ -202,7 +202,7 @@ public sealed class WorkDashboardController : MonoBehaviour
             overridden = result.overridden;
             overrideReason = result.reason;
 
-            GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, finalApproved, overridden, overrideReason);
+            GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, finalApproved, playerApproved, overridden, overrideReason);
 
             if (finalApproved)
                 AlgorithmDirector.Instance.TryEngagementNudge(_currentDbPost.id);
