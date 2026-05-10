@@ -13,6 +13,20 @@ public sealed class WorkDashboardController : MonoBehaviour
     [Tooltip("If true, pulls posts from GameDatabase and runs through AlgorithmDirector. Requires GameDatabase + AlgorithmDirector in scene.")]
     [SerializeField] private bool useGameDatabase = false;
 
+    /// <summary>
+    /// Intro/tutorial and boot flows can force the data source without exposing the field publicly.
+    /// </summary>
+    public void SetUseGameDatabase(bool useDb)
+    {
+        useGameDatabase = useDb;
+    }
+
+    /// <summary>Skip the automatic <see cref="StartSession"/> from the next <see cref="OnEnable"/> once (intro flow).</summary>
+    public void SuppressAutoStartSessionOnNextEnable()
+    {
+        _suppressStartSessionOnce = true;
+    }
+
     [Header("Top bar")]
     [SerializeField] private TMP_Text dayInfoText; // ex: "Day 1 — Posts: 0/10"
 
@@ -36,6 +50,8 @@ public sealed class WorkDashboardController : MonoBehaviour
     [Header("Decision")]
     [SerializeField] private Button approveButton;
     [SerializeField] private Button declineButton;
+    [Tooltip("Optional third action. If present, Flag maps to decline + an escalation reason (used by the intro/tutorial).")]
+    [SerializeField] private Button flagButton;
     [SerializeField] private TMP_Text decisionResultText;
 
     [Header("Day transition")]
@@ -65,6 +81,9 @@ public sealed class WorkDashboardController : MonoBehaviour
     private int _pendingNextDay = -1;
 
     private readonly System.Random rng = new();
+
+    /// <summary>Set by <see cref="GlitchInTheSystem.Intro.IntroManager"/> so opening the inactive window doesn't run <see cref="StartSession"/> before the tutorial queue exists.</summary>
+    private bool _suppressStartSessionOnce;
 
     private static readonly string[] FirstNames = { "Avery", "Jordan", "Sam", "Taylor", "Riley", "Morgan", "Casey", "Quinn", "Jamie", "Dakota" };
     private static readonly string[] LastNames = { "Nguyen", "Patel", "Johnson", "Garcia", "Kim", "Brown", "Lopez", "Singh", "Chen", "Martinez" };
@@ -107,6 +126,12 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private void OnEnable()
     {
+        if (_suppressStartSessionOnce)
+        {
+            _suppressStartSessionOnce = false;
+            return;
+        }
+
         StartSession();
     }
 
@@ -124,12 +149,18 @@ public sealed class WorkDashboardController : MonoBehaviour
     /// <summary>
     /// Inspector / Button hook.
     /// </summary>
-    public void Approve() => Decide(true);
+    public void Approve() => Decide(playerApproved: true, playerReason: null);
 
     /// <summary>
     /// Inspector / Button hook.
     /// </summary>
-    public void Decline() => Decide(false);
+    public void Decline() => Decide(playerApproved: false, playerReason: null);
+
+    /// <summary>
+    /// Optional action: treat as a removal + escalation note.
+    /// This keeps gameplay simple while still teaching a "flag/escalate" concept in the intro.
+    /// </summary>
+    public void Flag() => Decide(playerApproved: false, playerReason: "FLAG: Escalated for review");
 
     /// <summary>
     /// Call this when you open/show the dashboard panel. Resumes from last state if session in progress.
@@ -142,13 +173,25 @@ public sealed class WorkDashboardController : MonoBehaviour
 
         if (useGameDatabase && GameDatabase.Instance != null)
         {
-            postsPerSession = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.postsPerDay : 10;
-            dayNumber = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.currentDay : 1;
+            var db = GameDatabase.Instance;
+            dayNumber = db.Config != null ? db.Config.currentDay : 1;
+            int qCount = db.ModerationQueueCount;
+            postsPerSession = qCount > 0 ? qCount : (db.Config != null ? db.Config.postsPerDay : 10);
 
-            if (GameDatabase.Instance.HasSessionInProgress())
+            // Finished all items in this loaded queue → day-transition modal (avoid comparing to config-only length).
+            if (db.Posts.Count > 0 && qCount > 0 && db.GetDecisionsCount() >= qCount)
             {
-                // Resuming — don't reset, restore state and show current item
-                currentIndex = GameDatabase.Instance.GetDecisionsCount();
+                int nextDay = dayNumber + 1;
+                _pendingCompletedDay = dayNumber;
+                _pendingNextDay = nextDay;
+                ShowDayTransitionPanel(_pendingCompletedDay, _pendingNextDay);
+                return;
+            }
+
+            // Re-opening after ≥1 decisions (true resume). Not fired on first post at 0/N — that wrongly showed “Session resumed”.
+            if (db.HasResumeableModerationSession())
+            {
+                currentIndex = db.GetDecisionsCount();
                 if (decisionResultText != null) decisionResultText.text = "—";
                 ApplyFontMultiplier();
                 if (!EnsureReady()) return;
@@ -158,20 +201,22 @@ public sealed class WorkDashboardController : MonoBehaviour
                 return;
             }
 
-            // If the day is already completed, advance to next day once, then load the next queue.
-            // This prevents the "0/9 again" bug when re-opening the panel after finishing.
-            if (GameDatabase.Instance.Posts.Count > 0 && GameDatabase.Instance.GetDecisionsCount() >= postsPerSession)
+            // Queue already populated (tutorial, feed seeded early, etc.) but no decisions yet → use it once, do not wipe.
+            if (db.HasActiveModerationQueue() && db.Decisions.Count == 0)
             {
-                int nextDay = dayNumber + 1;
-                _pendingCompletedDay = dayNumber;
-                _pendingNextDay = nextDay;
-                ShowDayTransitionPanel(_pendingCompletedDay, _pendingNextDay);
+                currentIndex = 0;
+                if (decisionResultText != null) decisionResultText.text = "—";
+                ApplyFontMultiplier();
+                if (!EnsureReady()) return;
+                UpdateTopBar();
+                AlgorithmNotification.Instance?.Show(AlgorithmVoice.QueueLoaded(postsPerSession, dayNumber));
+                Next();
                 return;
             }
 
-            GameDatabase.Instance.InitializeSession();
-            postsPerSession = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.postsPerDay : postsPerSession;
-            dayNumber = GameDatabase.Instance.Config != null ? GameDatabase.Instance.Config.currentDay : dayNumber;
+            db.InitializeSession();
+            postsPerSession = db.Config != null ? db.Config.postsPerDay : postsPerSession;
+            dayNumber = db.Config != null ? db.Config.currentDay : dayNumber;
             currentIndex = 0;
             AlgorithmNotification.Instance?.Show(AlgorithmVoice.QueueLoaded(postsPerSession, dayNumber));
         }
@@ -254,7 +299,7 @@ public sealed class WorkDashboardController : MonoBehaviour
             tmp.fontSize = Mathf.RoundToInt(tmp.fontSize * fontSizeMultiplier);
     }
 
-    private void Decide(bool playerApproved)
+    private void Decide(bool playerApproved, string playerReason)
     {
         if (!EnsureReady()) return;
         if (currentIndex >= postsPerSession) return;
@@ -270,7 +315,9 @@ public sealed class WorkDashboardController : MonoBehaviour
             overridden = result.overridden;
             overrideReason = result.reason;
 
-            GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, finalApproved, playerApproved, overridden, overrideReason);
+            // If the algorithm didn't override, preserve playerReason (e.g. FLAG).
+            string recordReason = overridden ? overrideReason : playerReason;
+            GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, finalApproved, playerApproved, overridden, recordReason);
 
             if (finalApproved)
                 AlgorithmDirector.Instance.TryEngagementNudge(_currentDbPost.id);
@@ -288,7 +335,15 @@ public sealed class WorkDashboardController : MonoBehaviour
         if (decisionResultText != null)
         {
             if (useGameDatabase && _currentDbPost != null)
-                decisionResultText.text = ModerationDecisionFeedback.GetDashboardLine(finalApproved, overridden, _currentDbPost);
+            {
+                bool flagged = !overridden
+                              && !finalApproved
+                              && !string.IsNullOrEmpty(playerReason)
+                              && playerReason.StartsWith(ModerationDecisionFeedback.FlagReasonPrefix, StringComparison.Ordinal);
+                decisionResultText.text = flagged
+                    ? "Flagged"
+                    : ModerationDecisionFeedback.GetDashboardLine(finalApproved, overridden, _currentDbPost);
+            }
             else
                 decisionResultText.text = overridden ? $"{(finalApproved ? "Approved" : "Declined")} (overridden)" : (finalApproved ? "Approved" : "Declined");
         }
@@ -538,6 +593,7 @@ public sealed class WorkDashboardController : MonoBehaviour
 
         approveButton ??= FindButton("ApproveButton");
         declineButton ??= FindButton("DeclineButton");
+        flagButton ??= FindButton("FlagButton");
         decisionResultText ??= FindTMP("DecisionResultText");
         dayTransitionText ??= FindTMP("DayTransitionText");
 
@@ -619,6 +675,12 @@ public sealed class WorkDashboardController : MonoBehaviour
         {
             declineButton.onClick.RemoveAllListeners();
             declineButton.onClick.AddListener(Decline);
+        }
+
+        if (flagButton != null)
+        {
+            flagButton.onClick.RemoveAllListeners();
+            flagButton.onClick.AddListener(Flag);
         }
 
         if (dayTransitionProceedButton != null)

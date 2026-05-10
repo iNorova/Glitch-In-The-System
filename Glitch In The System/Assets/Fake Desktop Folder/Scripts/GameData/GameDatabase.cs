@@ -33,6 +33,12 @@ namespace GlitchInTheSystem.GameData
         /// <summary>Story flags (e.g. whether viral misinformation reached the public feed).</summary>
         public NarrativeState Narrative { get; } = new NarrativeState();
 
+        /// <summary>
+        /// Fired whenever <see cref="RecordDecision"/> appends a new decision.
+        /// Useful for UI flows (intro/tutorial, day transitions) without coupling to any specific controller.
+        /// </summary>
+        public event Action<ModerationDecision> DecisionRecorded;
+
         public IReadOnlyList<UserProfileData> Users => _users;
         public IReadOnlyList<PostData> Posts => _posts;
         public IReadOnlyList<ModerationDecision> Decisions => _decisions;
@@ -79,6 +85,26 @@ namespace GlitchInTheSystem.GameData
         }
 
         /// <summary>
+        /// Intro/tutorial-only: initialize a short, hand-authored moderation queue that teaches approve/remove/flag.
+        /// Keeps logic in GameDatabase so the tutorial uses the real moderation UI and recording pipeline.
+        /// </summary>
+        public void InitializeIntroTutorialSession()
+        {
+            _users.Clear();
+            _posts.Clear();
+            _moderationQueue.Clear();
+            _decisions.Clear();
+            _logs.Clear();
+            _queueIndex = 0;
+            Narrative.Reset();
+
+            // Keep currentDay as-is; intro can run before Day 1 without affecting pacing.
+            // We intentionally do NOT apply DayPacing here (it would force postsPerDay for day 1–3).
+
+            IntroTutorialContent.BuildInto(_users, _posts, _moderationQueue, _rng);
+        }
+
+        /// <summary>
         /// Get the next post in the moderation queue. Returns null when queue is empty.
         /// </summary>
         public (UserProfileData user, PostData post) GetNextModerationItem()
@@ -115,6 +141,7 @@ namespace GlitchInTheSystem.GameData
                 timestamp = Time.time
             };
             _decisions.Add(decision);
+            DecisionRecorded?.Invoke(decision);
 
             var post = _posts.FirstOrDefault(p => p.id == postId);
             if (post != null)
@@ -175,11 +202,25 @@ namespace GlitchInTheSystem.GameData
         }
 
         /// <summary>
-        /// True if we have a session with posts and haven't finished the queue.
+        /// Count of moderation items still in the queue (session length).
         /// </summary>
-        public bool HasSessionInProgress()
+        public int ModerationQueueCount => _moderationQueue.Count;
+
+        /// <summary>
+        /// True while there is still at least one post to moderate in the loaded queue.
+        /// </summary>
+        public bool HasActiveModerationQueue()
         {
-            return _moderationQueue.Count > 0 && _queueIndex < _moderationQueue.Count;
+            return _moderationQueue.Count > 0 && GetDecisionsCount() < _moderationQueue.Count;
+        }
+
+        /// <summary>
+        /// True when the queue is loaded AND the player has already made ≥1 decision (re-opening the dashboard = resume).
+        /// Not true at the very first item (0/N) — that was mistakenly treated as resume before.
+        /// </summary>
+        public bool HasResumeableModerationSession()
+        {
+            return HasActiveModerationQueue() && _decisions.Count > 0;
         }
 
         /// <summary>

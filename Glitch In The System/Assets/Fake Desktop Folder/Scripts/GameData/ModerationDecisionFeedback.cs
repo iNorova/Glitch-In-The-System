@@ -3,6 +3,8 @@ namespace GlitchInTheSystem.GameData
     /// <summary>Short lines for the work dashboard after each moderation decision.</summary>
     public static class ModerationDecisionFeedback
     {
+        public const string FlagReasonPrefix = "FLAG:";
+
         public static string GetDashboardLine(bool finalApproved, bool overridden, PostData post)
         {
             if (overridden)
