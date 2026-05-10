@@ -41,7 +41,8 @@ namespace GlitchInTheSystem.Intro
         [Header("Day 1 UI")]
         [SerializeField] private GameObject dayCardPanel;
         [SerializeField] private TMP_Text dayCardText;
-        [SerializeField] private float dayCardHoldSeconds = 1.0f;
+        [SerializeField] private float dayCardHoldSeconds = 2f;
+        [SerializeField] [Range(0f, 2f)] private float dayCardFadeInSeconds = 0.45f;
 
         [Header("Gameplay references")]
         [Tooltip("Your existing moderation dashboard controller.")]
@@ -53,6 +54,8 @@ namespace GlitchInTheSystem.Intro
 
         private Coroutine _flow;
         private int _tutorialDecisions;
+        private bool _tutorialProceedClicked;
+        private GameObject _tutorialProceedHudRoot;
         private Canvas _cachedIntroCanvas;
         /// <summary>On <see cref="Canvas"/> root; toggled so fullscreen <c>IntroBackdrop</c> does not eat clicks while moderating underneath.</summary>
         private CanvasGroup _introRootCanvasGroup;
@@ -268,6 +271,9 @@ namespace GlitchInTheSystem.Intro
 
         private IEnumerator RunTutorialPosts()
         {
+            _tutorialProceedClicked = false;
+            DestroyTutorialProceedHud();
+
             ShowOnly(tutorialHintPanel);
             // IntroCanvas is sort order 100; IntroBackdrop fills the screen and blocks rays to Work Dashboard underneath.
             // Pass rays through until tutorial finishes — same reason Esc "fixes" interaction (Esc runs skip teardown).
@@ -295,25 +301,186 @@ namespace GlitchInTheSystem.Intro
             _tutorialDecisions = 0;
             UpdateTutorialHint(_tutorialDecisions);
 
-            // Wait until player completes the short queue.
-            float timeoutAt = Time.unscaledTime + 120f; // safety net
-            while (_tutorialDecisions < IntroTutorialContent.TutorialPostCount && Time.unscaledTime < timeoutAt)
-                yield return null;
+            float tutorialStartedAt = Time.unscaledTime;
+            GameDatabase db = GameDatabase.Instance;
+            float timeoutAt = tutorialStartedAt + 300f; // safety net (button still appears sooner if stalled)
 
-            // Small pause so the last decision feedback is readable.
-            yield return new WaitForSecondsRealtime(0.35f);
+            try
+            {
+                while (!ShouldAdvanceFromIntroTutorial(db) && Time.unscaledTime < timeoutAt)
+                {
+                    float elapsed = Time.unscaledTime - tutorialStartedAt;
+                    MaybeOfferTutorialProceedBanner(db, elapsed);
+                    yield return null;
+                    db = GameDatabase.Instance;
+                }
 
-            SetIntroOverlayBlocksRaycasts(true);
+                // Small pause so the last decision feedback is readable.
+                yield return new WaitForSecondsRealtime(0.35f);
+            }
+            finally
+            {
+                DestroyTutorialProceedHud();
+            }
+
+            // RunDayCard will block rays again — keep pass-through until then so the 5th post is clickable.
+        }
+
+        /// <summary>
+        /// True when DecisionRecorded bookkeeping is in sync OR the GameDatabase queue says the tutorial slice is exhausted
+        /// (covers scenes without AlgorithmDirector where decisions formerly were not persisted).
+        /// </summary>
+        private static bool TutorialQueueMarkedComplete(GameDatabase db)
+        {
+            if (db == null) return false;
+            if (db.ModerationQueueCount != IntroTutorialContent.TutorialPostCount) return false;
+            return db.GetDecisionsCount() >= db.ModerationQueueCount;
+        }
+
+        private bool ShouldAdvanceFromIntroTutorial(GameDatabase db)
+        {
+            return _tutorialProceedClicked
+                   || _tutorialDecisions >= IntroTutorialContent.TutorialPostCount
+                   || TutorialQueueMarkedComplete(db);
+        }
+
+        private void MaybeOfferTutorialProceedBanner(GameDatabase db, float elapsedSeconds)
+        {
+            bool tutorialQueueConsumed = TutorialQueueMarkedComplete(db);
+            bool stalled = elapsedSeconds > 75f;
+
+            // Offer a clickable escape hatch that lives on the Work Dashboard canvas (Intro overlay intentionally ignores raycasts here).
+            if (!tutorialQueueConsumed && !stalled)
+                return;
+
+            EnsureTutorialProceedHud();
+            if (_tutorialProceedHudRoot == null)
+                return;
+
+            if (!_tutorialProceedHudRoot.activeSelf)
+            {
+                _tutorialProceedHudRoot.SetActive(true);
+                _tutorialProceedHudRoot.transform.SetAsLastSibling();
+            }
+
+            var bannerLabel = _tutorialProceedHudRoot.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (bannerLabel != null)
+            {
+                bannerLabel.text = tutorialQueueConsumed
+                    ? "Continue to Day 1"
+                    : "Skip tutorial · Start Day 1";
+            }
+        }
+
+        private void EnsureTutorialProceedHud()
+        {
+            if (_tutorialProceedHudRoot != null || workDashboard == null)
+                return;
+
+            var parentRt = workDashboard.transform as RectTransform;
+            if (parentRt == null)
+                return;
+
+            _tutorialProceedHudRoot = new GameObject("IntroTutorialProceedBanner", typeof(RectTransform));
+
+            RectTransform bannerRt = (RectTransform)_tutorialProceedHudRoot.transform;
+            bannerRt.SetParent(parentRt, false);
+
+            bannerRt.anchorMin = new Vector2(0f, 0f);
+            bannerRt.anchorMax = new Vector2(1f, 0f);
+            bannerRt.pivot = new Vector2(0.5f, 0f);
+            bannerRt.anchoredPosition = Vector2.zero;
+            bannerRt.sizeDelta = new Vector2(0f, 120f);
+
+            var bannerImg = _tutorialProceedHudRoot.AddComponent<Image>();
+            bannerImg.color = new Color(0f, 0f, 0f, 0.9f);
+            bannerImg.raycastTarget = true;
+
+            var bannerLe = _tutorialProceedHudRoot.AddComponent<LayoutElement>();
+            bannerLe.flexibleHeight = 0f;
+            bannerLe.preferredHeight = 120f;
+
+            GameObject btnGo = new GameObject("ProceedToDay1", typeof(RectTransform), typeof(Image), typeof(Button));
+            RectTransform btnRt = (RectTransform)btnGo.transform;
+            btnRt.SetParent(bannerRt, false);
+            btnRt.anchorMin = new Vector2(0.5f, 0.5f);
+            btnRt.anchorMax = new Vector2(0.5f, 0.5f);
+            btnRt.pivot = new Vector2(0.5f, 0.5f);
+            btnRt.sizeDelta = new Vector2(380f, 52f);
+
+            var btnGraphic = btnGo.GetComponent<Image>();
+            btnGraphic.color = new Color(0.23f, 0.62f, 0.96f, 1f);
+
+            Button proceed = btnGo.GetComponent<Button>();
+            var colors = proceed.colors;
+            colors.highlightedColor = new Color(0.35f, 0.7f, 1f);
+            colors.pressedColor = new Color(0.18f, 0.52f, 0.82f);
+            proceed.colors = colors;
+
+            proceed.onClick.AddListener(() => _tutorialProceedClicked = true);
+
+            GameObject lblGo = new GameObject("Label", typeof(RectTransform));
+            lblGo.transform.SetParent(btnRt, false);
+            var lblRt = (RectTransform)lblGo.transform;
+            lblRt.anchorMin = Vector2.zero;
+            lblRt.anchorMax = Vector2.one;
+            lblRt.offsetMin = Vector2.zero;
+            lblRt.offsetMax = Vector2.zero;
+
+            var tmp = lblGo.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = 22;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.enableWordWrapping = false;
+            bool bannerConsumedGuess = TutorialQueueMarkedComplete(GameDatabase.Instance);
+            tmp.text = bannerConsumedGuess
+                ? "Continue to Day 1"
+                : "Skip tutorial · Start Day 1";
+            tmp.color = Color.white;
+            tmp.raycastTarget = false;
+
+            _tutorialProceedHudRoot.SetActive(false);
+        }
+
+        private void DestroyTutorialProceedHud()
+        {
+            if (_tutorialProceedHudRoot == null) return;
+
+            Destroy(_tutorialProceedHudRoot);
+            _tutorialProceedHudRoot = null;
         }
 
         private IEnumerator RunDayCard()
         {
+            CloseWorkDashboardForIntroHandoff();
+
             SetIntroOverlayBlocksRaycasts(true);
             ShowOnly(dayCardPanel);
-            if (dayCardText != null)
-                dayCardText.text = "<size=44><b>DAY 1</b></size>\n\nQueue initializing…";
+            ApplyDayTransitionFullBleed();
 
-            yield return new WaitForSecondsRealtime(Mathf.Max(0.2f, dayCardHoldSeconds));
+            CanvasGroup cardGroup = EnsureCanvasGroup(dayCardPanel);
+            if (cardGroup != null)
+                cardGroup.ignoreParentGroups = true;
+            if (cardGroup != null && dayCardFadeInSeconds > 0.01f)
+            {
+                cardGroup.alpha = 0f;
+                yield return FadeCanvasGroupAlpha(cardGroup, 1f, dayCardFadeInSeconds);
+            }
+            else if (cardGroup != null)
+                cardGroup.alpha = 1f;
+
+            if (dayCardText != null)
+            {
+                dayCardText.enableAutoSizing = false;
+                dayCardText.fontSize = 42;
+                dayCardText.color = Color.white;
+                dayCardText.text = "<size=52><b>DAY 1</b></size>\n\n<size=26>Beginning live moderation queue.\nYou'll keep using the same tools.</size>";
+            }
+
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.5f, dayCardHoldSeconds));
+
+            // Quick fade before gameplay handoff.
+            if (cardGroup != null && dayCardFadeInSeconds > 0.01f)
+                yield return FadeCanvasGroupAlpha(cardGroup, 0f, dayCardFadeInSeconds * 0.75f);
         }
 
         private void MarkIntroSeen()
@@ -373,7 +540,9 @@ namespace GlitchInTheSystem.Intro
 
         private void OnDecisionRecorded(ModerationDecision decision)
         {
-            _tutorialDecisions = GameDatabase.Instance != null ? GameDatabase.Instance.GetDecisionsCount() : (_tutorialDecisions + 1);
+            // Do not use GetDecisionsCount() here — DecisionRecorded runs before AdvanceQueue() in Decide(),
+            // so _queueIndex lags one behind the recorded decision count and the tutorial loop never completes.
+            _tutorialDecisions = GameDatabase.Instance != null ? GameDatabase.Instance.Decisions.Count : (_tutorialDecisions + 1);
             UpdateTutorialHint(_tutorialDecisions);
 
             // When intro is done, stop showing hints so the day card feels like a clean handoff.
@@ -480,6 +649,73 @@ namespace GlitchInTheSystem.Intro
             EnsureIntroOverlayCanvasGroup();
             if (_introRootCanvasGroup == null) return;
             _introRootCanvasGroup.blocksRaycasts = blockRaycasts;
+        }
+
+        private static CanvasGroup EnsureCanvasGroup(GameObject go)
+        {
+            if (go == null) return null;
+            CanvasGroup cg = go.GetComponent<CanvasGroup>();
+            if (cg == null) cg = go.AddComponent<CanvasGroup>();
+            return cg;
+        }
+
+        private static IEnumerator FadeCanvasGroupAlpha(CanvasGroup cg, float endAlpha, float duration)
+        {
+            if (cg == null)
+                yield break;
+
+            float start = cg.alpha;
+            endAlpha = Mathf.Clamp01(endAlpha);
+            if (duration <= 0f)
+            {
+                cg.alpha = endAlpha;
+                yield break;
+            }
+
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Lerp(start, endAlpha, Mathf.Clamp01(t / duration));
+                yield return null;
+            }
+
+            cg.alpha = endAlpha;
+        }
+
+        private void ApplyDayTransitionFullBleed()
+        {
+            if (dayCardPanel == null) return;
+
+            var rt = dayCardPanel.transform as RectTransform;
+            if (rt != null)
+            {
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                rt.anchoredPosition = Vector2.zero;
+            }
+
+            var img = dayCardPanel.GetComponent<Image>();
+            if (img != null)
+            {
+                img.color = new Color(0f, 0f, 0f, 1f);
+                img.raycastTarget = true;
+            }
+
+            dayCardPanel.transform.SetAsLastSibling();
+        }
+
+        private void CloseWorkDashboardForIntroHandoff()
+        {
+            if (workDashboard == null) return;
+            DesktopAppWindow app = workDashboard.GetComponent<DesktopAppWindow>();
+            if (app != null)
+                app.Close();
+            else
+                workDashboard.gameObject.SetActive(false);
         }
 
         /// <summary>

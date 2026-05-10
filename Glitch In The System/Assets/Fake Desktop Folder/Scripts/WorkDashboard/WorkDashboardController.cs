@@ -308,27 +308,35 @@ public sealed class WorkDashboardController : MonoBehaviour
         bool overridden = false;
         string overrideReason = null;
 
-        if (useGameDatabase && _currentDbPost != null && _currentDbUser != null && AlgorithmDirector.Instance != null)
+        if (useGameDatabase && _currentDbPost != null && _currentDbUser != null && GameDatabase.Instance != null)
         {
-            var result = AlgorithmDirector.Instance.ProcessDecision(_currentDbPost.id, _currentDbUser.id, playerApproved, _currentDbPost);
-            finalApproved = result.approved;
-            overridden = result.overridden;
-            overrideReason = result.reason;
-
-            // If the algorithm didn't override, preserve playerReason (e.g. FLAG).
-            string recordReason = overridden ? overrideReason : playerReason;
-            GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, finalApproved, playerApproved, overridden, recordReason);
-
-            if (finalApproved)
-                AlgorithmDirector.Instance.TryEngagementNudge(_currentDbPost.id);
-            else
-                AlgorithmDirector.Instance.TryShadowBanOnDecline(_currentDbUser.id);
-
-            // Algorithm responds to your decision (content-aware: approved misinformation, declined real info, etc.)
-            if (!overridden && AlgorithmNotification.Instance != null)
+            if (AlgorithmDirector.Instance != null)
             {
-                var feedback = AlgorithmVoice.DecisionFeedback(_currentDbPost, playerApproved, AlgorithmDirector.Instance.Phase, _currentDbUser.username);
-                if (feedback != null) AlgorithmNotification.Instance.Show(feedback, 3f);
+                var result = AlgorithmDirector.Instance.ProcessDecision(_currentDbPost.id, _currentDbUser.id, playerApproved, _currentDbPost);
+                finalApproved = result.approved;
+                overridden = result.overridden;
+                overrideReason = result.reason;
+
+                // If the algorithm didn't override, preserve playerReason (e.g. FLAG).
+                string recordReason = overridden ? overrideReason : playerReason;
+                GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, finalApproved, playerApproved, overridden, recordReason);
+
+                if (finalApproved)
+                    AlgorithmDirector.Instance.TryEngagementNudge(_currentDbPost.id);
+                else
+                    AlgorithmDirector.Instance.TryShadowBanOnDecline(_currentDbUser.id);
+
+                // Algorithm responds to your decision (content-aware: approved misinformation, declined real info, etc.)
+                if (!overridden && AlgorithmNotification.Instance != null)
+                {
+                    var feedback = AlgorithmVoice.DecisionFeedback(_currentDbPost, playerApproved, AlgorithmDirector.Instance.Phase, _currentDbUser.username);
+                    if (feedback != null)
+                        AlgorithmNotification.Instance.Show(feedback, 3f);
+                }
+            }
+            else
+            {
+                GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, playerApproved, playerApproved, false, playerReason);
             }
         }
 
