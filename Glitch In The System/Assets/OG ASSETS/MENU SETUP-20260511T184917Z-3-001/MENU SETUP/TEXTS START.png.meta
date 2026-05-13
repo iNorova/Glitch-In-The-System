@@ -1,0 +1,3679 @@
+fileFormatVersion: 2
+guid: 2d304eda1f0a2db40bfed93e27f11b9c
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 1231618202696494196
+    second: TEXTS START_0
+  - first:
+      213: -8476863812667084410
+    second: TEXTS START_1
+  - first:
+      213: 8033405893291855005
+    second: TEXTS START_2
+  - first:
+      213: -6503394371880759581
+    second: TEXTS START_3
+  - first:
+      213: -7159378006981980146
+    second: TEXTS START_4
+  - first:
+      213: 5890409537672526213
+    second: TEXTS START_5
+  - first:
+      213: -3924482632234794131
+    second: TEXTS START_6
+  - first:
+      213: -8357087289258601492
+    second: TEXTS START_7
+  - first:
+      213: 7702442538916630635
+    second: TEXTS START_8
+  - first:
+      213: -156406273036831687
+    second: TEXTS START_9
+  - first:
+      213: -955301539505549657
+    second: TEXTS START_10
+  - first:
+      213: 5856658748678168010
+    second: TEXTS START_11
+  - first:
+      213: 9110537959688247435
+    second: TEXTS START_12
+  - first:
+      213: 834081884047101375
+    second: TEXTS START_13
+  - first:
+      213: 2494199821278836690
+    second: TEXTS START_14
+  - first:
+      213: -8186024812309692955
+    second: TEXTS START_15
+  - first:
+      213: -4940252827035944783
+    second: TEXTS START_16
+  - first:
+      213: 5226342896512502982
+    second: TEXTS START_17
+  - first:
+      213: -4886878267542534749
+    second: TEXTS START_18
+  - first:
+      213: -5066956508689717371
+    second: TEXTS START_19
+  - first:
+      213: -2471985387852421731
+    second: TEXTS START_20
+  - first:
+      213: -3085760129189187425
+    second: TEXTS START_21
+  - first:
+      213: -5577320085760809084
+    second: TEXTS START_22
+  - first:
+      213: -5229987547281977607
+    second: TEXTS START_23
+  - first:
+      213: 1053759141190394448
+    second: TEXTS START_24
+  - first:
+      213: 8599785551581829994
+    second: TEXTS START_25
+  - first:
+      213: -3312495962523855025
+    second: TEXTS START_26
+  - first:
+      213: 2068227569869930539
+    second: TEXTS START_27
+  - first:
+      213: 6476558844929540841
+    second: TEXTS START_28
+  - first:
+      213: -6156422419313553876
+    second: TEXTS START_29
+  - first:
+      213: -8911943049718773172
+    second: TEXTS START_30
+  - first:
+      213: -1990346093955036237
+    second: TEXTS START_31
+  - first:
+      213: 2550705828715530148
+    second: TEXTS START_32
+  - first:
+      213: 4089302526344630566
+    second: TEXTS START_33
+  - first:
+      213: 4406178969346761199
+    second: TEXTS START_34
+  - first:
+      213: -1494387233109328408
+    second: TEXTS START_35
+  - first:
+      213: -5800301584518907019
+    second: TEXTS START_36
+  - first:
+      213: 7135019949729921635
+    second: TEXTS START_37
+  - first:
+      213: 2770561119367171294
+    second: TEXTS START_38
+  - first:
+      213: 8718993167988639281
+    second: TEXTS START_39
+  - first:
+      213: 1436619544986164419
+    second: TEXTS START_40
+  - first:
+      213: 6570898560246725425
+    second: TEXTS START_41
+  - first:
+      213: 4141132363235966205
+    second: TEXTS START_42
+  - first:
+      213: 3473309596714351263
+    second: TEXTS START_43
+  - first:
+      213: -3519534424672097976
+    second: TEXTS START_44
+  - first:
+      213: -1394846623427699701
+    second: TEXTS START_45
+  - first:
+      213: -5633282590520836894
+    second: TEXTS START_46
+  - first:
+      213: 297540192944082008
+    second: TEXTS START_47
+  - first:
+      213: -5776789660634336500
+    second: TEXTS START_48
+  - first:
+      213: -744986672418011749
+    second: TEXTS START_49
+  - first:
+      213: -5116758773835956956
+    second: TEXTS START_50
+  - first:
+      213: -8333481945964734610
+    second: TEXTS START_51
+  - first:
+      213: -2214521018840092963
+    second: TEXTS START_52
+  - first:
+      213: 5117029781262638137
+    second: TEXTS START_53
+  - first:
+      213: -6214933086531045803
+    second: TEXTS START_54
+  - first:
+      213: -4392940422998054708
+    second: TEXTS START_55
+  - first:
+      213: 2314411396002965142
+    second: TEXTS START_56
+  - first:
+      213: -3311172493064887480
+    second: TEXTS START_57
+  - first:
+      213: 3624026479421876383
+    second: TEXTS START_58
+  - first:
+      213: 3291452089273390442
+    second: TEXTS START_59
+  - first:
+      213: 6501920670722967672
+    second: TEXTS START_60
+  - first:
+      213: 298318939781921512
+    second: TEXTS START_61
+  - first:
+      213: -5643459930489313648
+    second: TEXTS START_62
+  - first:
+      213: -1609724207460978905
+    second: TEXTS START_63
+  - first:
+      213: 754124487864766319
+    second: TEXTS START_64
+  - first:
+      213: -2645057121053456894
+    second: TEXTS START_65
+  - first:
+      213: -1491820849798485178
+    second: TEXTS START_66
+  - first:
+      213: 37333355345843366
+    second: TEXTS START_67
+  - first:
+      213: 281587597133544
+    second: TEXTS START_68
+  - first:
+      213: -250469785297269534
+    second: TEXTS START_69
+  - first:
+      213: -940903943967637597
+    second: TEXTS START_70
+  - first:
+      213: -5349367338824514171
+    second: TEXTS START_71
+  - first:
+      213: 3104901114136010046
+    second: TEXTS START_72
+  - first:
+      213: 2501458634340989846
+    second: TEXTS START_73
+  - first:
+      213: 1507226694509708038
+    second: TEXTS START_74
+  - first:
+      213: 941738887148481442
+    second: TEXTS START_75
+  - first:
+      213: 5396043642153278491
+    second: TEXTS START_76
+  - first:
+      213: -2346422174005380468
+    second: TEXTS START_77
+  - first:
+      213: -5545223406956011964
+    second: TEXTS START_78
+  - first:
+      213: -3631325614620605316
+    second: TEXTS START_79
+  - first:
+      213: -3689777278871286288
+    second: TEXTS START_80
+  - first:
+      213: -1511978195681762599
+    second: TEXTS START_81
+  - first:
+      213: -420514741580379790
+    second: TEXTS START_82
+  - first:
+      213: -3482287229465977696
+    second: TEXTS START_83
+  - first:
+      213: -8167018987166625557
+    second: TEXTS START_84
+  - first:
+      213: 198910407280012315
+    second: TEXTS START_85
+  - first:
+      213: -8825404793932242434
+    second: TEXTS START_86
+  - first:
+      213: 2594313078617391466
+    second: TEXTS START_87
+  - first:
+      213: 3953954235515249290
+    second: TEXTS START_88
+  - first:
+      213: 3887560105320276326
+    second: TEXTS START_89
+  - first:
+      213: -8627227826122281744
+    second: TEXTS START_90
+  - first:
+      213: 7517774208321397363
+    second: TEXTS START_91
+  - first:
+      213: -3103563370584865148
+    second: TEXTS START_92
+  - first:
+      213: 6474990274495728068
+    second: TEXTS START_93
+  - first:
+      213: -8462503661389020253
+    second: TEXTS START_94
+  - first:
+      213: 6494931748750305648
+    second: TEXTS START_95
+  - first:
+      213: 5015230224674422882
+    second: TEXTS START_96
+  - first:
+      213: 1780833271633520550
+    second: TEXTS START_97
+  - first:
+      213: 8860094207998893641
+    second: TEXTS START_98
+  - first:
+      213: 8193895040335305068
+    second: TEXTS START_99
+  - first:
+      213: -3349265920205842464
+    second: TEXTS START_100
+  - first:
+      213: 1155356086285152827
+    second: TEXTS START_101
+  - first:
+      213: 127429576995744362
+    second: TEXTS START_102
+  - first:
+      213: -5554020235966654590
+    second: TEXTS START_103
+  - first:
+      213: -8391953318311661772
+    second: TEXTS START_104
+  - first:
+      213: 2775462434526174528
+    second: TEXTS START_105
+  - first:
+      213: -978771998466375233
+    second: TEXTS START_106
+  - first:
+      213: -928121579561639892
+    second: TEXTS START_107
+  - first:
+      213: 7639186744284995819
+    second: TEXTS START_108
+  - first:
+      213: 3173307361712270053
+    second: TEXTS START_109
+  - first:
+      213: -5767348192047715891
+    second: TEXTS START_110
+  - first:
+      213: -4975897454826385646
+    second: TEXTS START_111
+  - first:
+      213: -9209018958959997474
+    second: TEXTS START_112
+  - first:
+      213: 1246772479152425553
+    second: TEXTS START_113
+  - first:
+      213: 5144299128716215078
+    second: TEXTS START_114
+  - first:
+      213: 6932154532830624094
+    second: TEXTS START_115
+  - first:
+      213: 6189502582420751208
+    second: TEXTS START_116
+  - first:
+      213: -7530594166222934766
+    second: TEXTS START_117
+  - first:
+      213: -7088936655000501447
+    second: TEXTS START_118
+  - first:
+      213: 5854537425181993303
+    second: TEXTS START_119
+  - first:
+      213: 3644217264215773889
+    second: TEXTS START_120
+  - first:
+      213: 7241709341228896365
+    second: TEXTS START_121
+  - first:
+      213: -5335556343193714997
+    second: TEXTS START_122
+  - first:
+      213: -8060141762035190163
+    second: TEXTS START_123
+  - first:
+      213: -8886207361584923190
+    second: TEXTS START_124
+  - first:
+      213: -7298698349153901333
+    second: TEXTS START_125
+  - first:
+      213: 39083635166621511
+    second: TEXTS START_126
+  - first:
+      213: 4301613497653843779
+    second: TEXTS START_127
+  - first:
+      213: -5658537337298139474
+    second: TEXTS START_128
+  - first:
+      213: 2778326087888958922
+    second: TEXTS START_129
+  - first:
+      213: -3309349316817091216
+    second: TEXTS START_130
+  - first:
+      213: -2470173828386211767
+    second: TEXTS START_131
+  - first:
+      213: -7421845047448468019
+    second: TEXTS START_132
+  - first:
+      213: -2275693979673846388
+    second: TEXTS START_133
+  - first:
+      213: -2771831461083688095
+    second: TEXTS START_134
+  - first:
+      213: -2916929748260135444
+    second: TEXTS START_135
+  - first:
+      213: -8662208102856781721
+    second: TEXTS START_136
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: TEXTS START_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 2212
+        width: 38
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 47c21aeda36971110800000000000000
+      internalID: 1231618202696494196
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_1
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6817d9456412c5a80800000000000000
+      internalID: -8476863812667084410
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_2
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d9cc03ed8146c7f60800000000000000
+      internalID: 8033405893291855005
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_3
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3eec5c5764d4fb5a0800000000000000
+      internalID: -6503394371880759581
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_4
+      rect:
+        serializedVersion: 2
+        x: 177
+        y: 2212
+        width: 25
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e00581972a7c4ac90800000000000000
+      internalID: -7159378006981980146
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_5
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5893b8a0440feb150800000000000000
+      internalID: 5890409537672526213
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_6
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d63847ab6df6989c0800000000000000
+      internalID: -3924482632234794131
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_7
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ce31fce5369a50c80800000000000000
+      internalID: -8357087289258601492
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_8
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b60dbfa0ea294ea60800000000000000
+      internalID: 7702442538916630635
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_9
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9343ff6c25554ddf0800000000000000
+      internalID: -156406273036831687
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_10
+      rect:
+        serializedVersion: 2
+        x: 469
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7ae436caf461eb2f0800000000000000
+      internalID: -955301539505549657
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_11
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: acd55ad1a18074150800000000000000
+      internalID: 5856658748678168010
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_12
+      rect:
+        serializedVersion: 2
+        x: 555
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b881eef21022f6e70800000000000000
+      internalID: 9110537959688247435
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_13
+      rect:
+        serializedVersion: 2
+        x: 597
+        y: 2212
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fbd473ced01439b00800000000000000
+      internalID: 834081884047101375
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_14
+      rect:
+        serializedVersion: 2
+        x: 1214
+        y: 2073
+        width: 41
+        height: 46
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2d7fa2ac58d2d9220800000000000000
+      internalID: 2494199821278836690
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_15
+      rect:
+        serializedVersion: 2
+        x: 1258
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5ed3fbbfdc5656e80800000000000000
+      internalID: -8186024812309692955
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_16
+      rect:
+        serializedVersion: 2
+        x: 1303
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1b837e77a32b07bb0800000000000000
+      internalID: -4940252827035944783
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_17
+      rect:
+        serializedVersion: 2
+        x: 1348
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6cc830d8c23b78840800000000000000
+      internalID: 5226342896512502982
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_18
+      rect:
+        serializedVersion: 2
+        x: 1392
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3a50d828b125e2cb0800000000000000
+      internalID: -4886878267542534749
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_19
+      rect:
+        serializedVersion: 2
+        x: 1437
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5872237b6ed8ea9b0800000000000000
+      internalID: -5066956508689717371
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_20
+      rect:
+        serializedVersion: 2
+        x: 1482
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d95a91b036eb1bdd0800000000000000
+      internalID: -2471985387852421731
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_21
+      rect:
+        serializedVersion: 2
+        x: 1527
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f907d95f28d2d25d0800000000000000
+      internalID: -3085760129189187425
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_22
+      rect:
+        serializedVersion: 2
+        x: 1571
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 48763919ee06992b0800000000000000
+      internalID: -5577320085760809084
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_23
+      rect:
+        serializedVersion: 2
+        x: 1616
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9fe8a80190a5b67b0800000000000000
+      internalID: -5229987547281977607
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_24
+      rect:
+        serializedVersion: 2
+        x: 1661
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 05269791b54bf9e00800000000000000
+      internalID: 1053759141190394448
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_25
+      rect:
+        serializedVersion: 2
+        x: 1705
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a6b52924563985770800000000000000
+      internalID: 8599785551581829994
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_26
+      rect:
+        serializedVersion: 2
+        x: 1750
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f4799d1f876a702d0800000000000000
+      internalID: -3312495962523855025
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_27
+      rect:
+        serializedVersion: 2
+        x: 1795
+        y: 2069
+        width: 41
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b2044c05402d3bc10800000000000000
+      internalID: 2068227569869930539
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_28
+      rect:
+        serializedVersion: 2
+        x: 1840
+        y: 2069
+        width: 40
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9e280f684fb51e950800000000000000
+      internalID: 6476558844929540841
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_29
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1962
+        width: 38
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c2e80918d6eff8aa0800000000000000
+      internalID: -6156422419313553876
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_30
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c4a4007830b625480800000000000000
+      internalID: -8911943049718773172
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_31
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3bb49b9d5ced064e0800000000000000
+      internalID: -1990346093955036237
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_32
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4a78b1fdf6de56320800000000000000
+      internalID: 2550705828715530148
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_33
+      rect:
+        serializedVersion: 2
+        x: 170
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 62111ed4bfe10c830800000000000000
+      internalID: 4089302526344630566
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_34
+      rect:
+        serializedVersion: 2
+        x: 220
+        y: 1962
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fe1e5bc7d64e52d30800000000000000
+      internalID: 4406178969346761199
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_35
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8edb3a5aabed24be0800000000000000
+      internalID: -1494387233109328408
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_36
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 57b7d90b070318fa0800000000000000
+      internalID: -5800301584518907019
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_37
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 36a3af067dea40360800000000000000
+      internalID: 7135019949729921635
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_38
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: edc8364b8a2037620800000000000000
+      internalID: 2770561119367171294
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_39
+      rect:
+        serializedVersion: 2
+        x: 476
+        y: 1962
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 13645015716100970800000000000000
+      internalID: 8718993167988639281
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_40
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3cc98485dd5efe310800000000000000
+      internalID: 1436619544986164419
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_41
+      rect:
+        serializedVersion: 2
+        x: 597
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 13bb1aa2d65803b50800000000000000
+      internalID: 6570898560246725425
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_42
+      rect:
+        serializedVersion: 2
+        x: 640
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dfcbd8691f1487930800000000000000
+      internalID: 4141132363235966205
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_43
+      rect:
+        serializedVersion: 2
+        x: 683
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f9a3d130daca33030800000000000000
+      internalID: 3473309596714351263
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_44
+      rect:
+        serializedVersion: 2
+        x: 726
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 84929aa861a182fc0800000000000000
+      internalID: -3519534424672097976
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_45
+      rect:
+        serializedVersion: 2
+        x: 769
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b0c507ed26284ace0800000000000000
+      internalID: -1394846623427699701
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_46
+      rect:
+        serializedVersion: 2
+        x: 811
+        y: 1962
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2ecfc90945f82d1b0800000000000000
+      internalID: -5633282590520836894
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_47
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1687
+        width: 38
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 85c45d2aa33112400800000000000000
+      internalID: 297540192944082008
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_48
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c03bdbf0968b4dfa0800000000000000
+      internalID: -5776789660634336500
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_49
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b95cf1c819649a5f0800000000000000
+      internalID: -744986672418011749
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_50
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 42df424410f9df8b0800000000000000
+      internalID: -5116758773835956956
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_51
+      rect:
+        serializedVersion: 2
+        x: 170
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e6714a4a256895c80800000000000000
+      internalID: -8333481945964734610
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_52
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dde666ccdd07441e0800000000000000
+      internalID: -2214521018840092963
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_53
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 93c11419977530740800000000000000
+      internalID: 5117029781262638137
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_54
+      rect:
+        serializedVersion: 2
+        x: 298
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 556be72394f10c9a0800000000000000
+      internalID: -6214933086531045803
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_55
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cc82fb7c5f32903c0800000000000000
+      internalID: -4392940422998054708
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_56
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 1687
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6966fd207e07e1020800000000000000
+      internalID: 2314411396002965142
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_57
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1438
+        width: 38
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 843a2d0392a5c02d0800000000000000
+      internalID: -3311172493064887480
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_58
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f98ec82d1e02b4230800000000000000
+      internalID: 3624026479421876383
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_59
+      rect:
+        serializedVersion: 2
+        x: 91
+        y: 1438
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a659b508c369dad20800000000000000
+      internalID: 3291452089273390442
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_60
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8784630c6667b3a50800000000000000
+      internalID: 6501920670722967672
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_61
+      rect:
+        serializedVersion: 2
+        x: 170
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8eaf873ce77d32400800000000000000
+      internalID: 298318939781921512
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_62
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 096a803f7176ea1b0800000000000000
+      internalID: -5643459930489313648
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_63
+      rect:
+        serializedVersion: 2
+        x: 298
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 72fe0fbac5c19a9e0800000000000000
+      internalID: -1609724207460978905
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_64
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f6f4a97e930377a00800000000000000
+      internalID: 754124487864766319
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_65
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 206cdf0009eda4bd0800000000000000
+      internalID: -2645057121053456894
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_66
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 64b6d3357dcfb4be0800000000000000
+      internalID: -1491820849798485178
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_67
+      rect:
+        serializedVersion: 2
+        x: 469
+        y: 1438
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6a499a72d72a48000800000000000000
+      internalID: 37333355345843366
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_68
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1179
+        width: 38
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e643b83a10010000800000000000000
+      internalID: 281587597133544
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_69
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 1179
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2ec436cae07268cf0800000000000000
+      internalID: -250469785297269534
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_70
+      rect:
+        serializedVersion: 2
+        x: 91
+        y: 1179
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3af7b0c19dc31f2f0800000000000000
+      internalID: -940903943967637597
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_71
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 1179
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 585c94c5fba33c5b0800000000000000
+      internalID: -5349367338824514171
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_72
+      rect:
+        serializedVersion: 2
+        x: 170
+        y: 1179
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e3d9ac2ec13d61b20800000000000000
+      internalID: 3104901114136010046
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_73
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 912
+        width: 38
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 69b7a38ef57f6b220800000000000000
+      internalID: 2501458634340989846
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_74
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 603cc3a61bebae410800000000000000
+      internalID: 1507226694509708038
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_75
+      rect:
+        serializedVersion: 2
+        x: 91
+        y: 912
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2ab28af378ab11d00800000000000000
+      internalID: 941738887148481442
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_76
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b1c1d036a1992ea40800000000000000
+      internalID: 5396043642153278491
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_77
+      rect:
+        serializedVersion: 2
+        x: 170
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c8a3f41f675df6fd0800000000000000
+      internalID: -2346422174005380468
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_78
+      rect:
+        serializedVersion: 2
+        x: 220
+        y: 912
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 44e9434f0b86b03b0800000000000000
+      internalID: -5545223406956011964
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_79
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c7403c4d790fa9dc0800000000000000
+      internalID: -3631325614620605316
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_80
+      rect:
+        serializedVersion: 2
+        x: 298
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0fdc1983d174bccc0800000000000000
+      internalID: -3689777278871286288
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_81
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9d2a04287df540be0800000000000000
+      internalID: -1511978195681762599
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_82
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 279494d02180a2af0800000000000000
+      internalID: -420514741580379790
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_83
+      rect:
+        serializedVersion: 2
+        x: 469
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0ac1dc9f63e6cafc0800000000000000
+      internalID: -3482287229465977696
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_84
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 912
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: be0101c708be8ae80800000000000000
+      internalID: -8167018987166625557
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_85
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 636
+        width: 38
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b1cad0826fba2c200800000000000000
+      internalID: 198910407280012315
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_86
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ef1a3a2591dd58580800000000000000
+      internalID: -8825404793932242434
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_87
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a61c32feff9d00420800000000000000
+      internalID: 2594313078617391466
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_88
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a82a902ad644fd630800000000000000
+      internalID: 3953954235515249290
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_89
+      rect:
+        serializedVersion: 2
+        x: 170
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6616890915363f530800000000000000
+      internalID: 3887560105320276326
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_90
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0fcad9b400ee54880800000000000000
+      internalID: -8627227826122281744
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_91
+      rect:
+        serializedVersion: 2
+        x: 298
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3722794cfcf745860800000000000000
+      internalID: 7517774208321397363
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_92
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 486006ece8dede4d0800000000000000
+      internalID: -3103563370584865148
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_93
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4c94d634959cbd950800000000000000
+      internalID: 6474990274495728068
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_94
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3a3077891c52f8a80800000000000000
+      internalID: -8462503661389020253
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_95
+      rect:
+        serializedVersion: 2
+        x: 469
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0792bac8302a22a50800000000000000
+      internalID: 6494931748750305648
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_96
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2608588415da99540800000000000000
+      internalID: 5015230224674422882
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_97
+      rect:
+        serializedVersion: 2
+        x: 555
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6a7a9efdc6ac6b810800000000000000
+      internalID: 1780833271633520550
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_98
+      rect:
+        serializedVersion: 2
+        x: 640
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 94e15484db065fa70800000000000000
+      internalID: 8860094207998893641
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_99
+      rect:
+        serializedVersion: 2
+        x: 683
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c695506402096b170800000000000000
+      internalID: 8193895040335305068
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_100
+      rect:
+        serializedVersion: 2
+        x: 726
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0e71fc704640581d0800000000000000
+      internalID: -3349265920205842464
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_101
+      rect:
+        serializedVersion: 2
+        x: 769
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b32bc183d36a80010800000000000000
+      internalID: 1155356086285152827
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_102
+      rect:
+        serializedVersion: 2
+        x: 811
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a6aa5be6688b4c100800000000000000
+      internalID: 127429576995744362
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_103
+      rect:
+        serializedVersion: 2
+        x: 854
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 28750e795082ce2b0800000000000000
+      internalID: -5554020235966654590
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_104
+      rect:
+        serializedVersion: 2
+        x: 897
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 43f6f526beac98b80800000000000000
+      internalID: -8391953318311661772
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_105
+      rect:
+        serializedVersion: 2
+        x: 947
+        y: 636
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 04d9f51116c648620800000000000000
+      internalID: 2775462434526174528
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_106
+      rect:
+        serializedVersion: 2
+        x: 982
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fb1005b9d04ba62f0800000000000000
+      internalID: -978771998466375233
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_107
+      rect:
+        serializedVersion: 2
+        x: 1025
+        y: 636
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c20aadd3756ae13f0800000000000000
+      internalID: -928121579561639892
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_108
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 351
+        width: 38
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: be0eaf9aed7d30a60800000000000000
+      internalID: 7639186744284995819
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_109
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5eaedf98b3ad90c20800000000000000
+      internalID: 3173307361712270053
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_110
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc92105406346ffa0800000000000000
+      internalID: -5767348192047715891
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_111
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 21f8d46d0af02fab0800000000000000
+      internalID: -4975897454826385646
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_112
+      rect:
+        serializedVersion: 2
+        x: 170
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: edd0a5d5c0ef23080800000000000000
+      internalID: -9209018958959997474
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_113
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 15a0d9fc6fc6d4110800000000000000
+      internalID: 1246772479152425553
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_114
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6234b794dc8346740800000000000000
+      internalID: 5144299128716215078
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_115
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e59bb79c1d5f33060800000000000000
+      internalID: 6932154532830624094
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_116
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8634d892ec785e550800000000000000
+      internalID: 6189502582420751208
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_117
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 21d27ae2184fd7790800000000000000
+      internalID: -7530594166222934766
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_118
+      rect:
+        serializedVersion: 2
+        x: 469
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 933037bcba90f9d90800000000000000
+      internalID: -7088936655000501447
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_119
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 759e33005ce7f3150800000000000000
+      internalID: 5854537425181993303
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_120
+      rect:
+        serializedVersion: 2
+        x: 555
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1c25ded3b4cd29230800000000000000
+      internalID: 3644217264215773889
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_121
+      rect:
+        serializedVersion: 2
+        x: 597
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d6093921748bf7460800000000000000
+      internalID: 7241709341228896365
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_122
+      rect:
+        serializedVersion: 2
+        x: 647
+        y: 351
+        width: 25
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bce3bdc56cb44f5b0800000000000000
+      internalID: -5335556343193714997
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_123
+      rect:
+        serializedVersion: 2
+        x: 683
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d66f99a95cf942090800000000000000
+      internalID: -8060141762035190163
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_124
+      rect:
+        serializedVersion: 2
+        x: 726
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: acdf44c5c79dda480800000000000000
+      internalID: -8886207361584923190
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_125
+      rect:
+        serializedVersion: 2
+        x: 769
+        y: 351
+        width: 39
+        height: 53
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: be4a3f78580d5ba90800000000000000
+      internalID: -7298698349153901333
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_126
+      rect:
+        serializedVersion: 2
+        x: 1
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 74f23aeeb5ada8000800000000000000
+      internalID: 39083635166621511
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_127
+      rect:
+        serializedVersion: 2
+        x: 44
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 347dea86fa662bb30800000000000000
+      internalID: 4301613497653843779
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_128
+      rect:
+        serializedVersion: 2
+        x: 86
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ea64f0e9546d871b0800000000000000
+      internalID: -5658537337298139474
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_129
+      rect:
+        serializedVersion: 2
+        x: 172
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ac572d25bd89e8620800000000000000
+      internalID: 2778326087888958922
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_130
+      rect:
+        serializedVersion: 2
+        x: 215
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0758f6d7454d212d0800000000000000
+      internalID: -3309349316817091216
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_131
+      rect:
+        serializedVersion: 2
+        x: 258
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 948b2999dfd28bdd0800000000000000
+      internalID: -2470173828386211767
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_132
+      rect:
+        serializedVersion: 2
+        x: 300
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc587d0804f400990800000000000000
+      internalID: -7421845047448468019
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_133
+      rect:
+        serializedVersion: 2
+        x: 343
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c8d9b04f16c1b60e0800000000000000
+      internalID: -2275693979673846388
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_134
+      rect:
+        serializedVersion: 2
+        x: 386
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 163dad0d8f97889d0800000000000000
+      internalID: -2771831461083688095
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_135
+      rect:
+        serializedVersion: 2
+        x: 429
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ced5f2839dbf487d0800000000000000
+      internalID: -2916929748260135444
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TEXTS START_136
+      rect:
+        serializedVersion: 2
+        x: 471
+        y: 0
+        width: 39
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 76016b2ff97a9c780800000000000000
+      internalID: -8662208102856781721
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      TEXTS START_0: 1231618202696494196
+      TEXTS START_1: -8476863812667084410
+      TEXTS START_10: -955301539505549657
+      TEXTS START_100: -3349265920205842464
+      TEXTS START_101: 1155356086285152827
+      TEXTS START_102: 127429576995744362
+      TEXTS START_103: -5554020235966654590
+      TEXTS START_104: -8391953318311661772
+      TEXTS START_105: 2775462434526174528
+      TEXTS START_106: -978771998466375233
+      TEXTS START_107: -928121579561639892
+      TEXTS START_108: 7639186744284995819
+      TEXTS START_109: 3173307361712270053
+      TEXTS START_11: 5856658748678168010
+      TEXTS START_110: -5767348192047715891
+      TEXTS START_111: -4975897454826385646
+      TEXTS START_112: -9209018958959997474
+      TEXTS START_113: 1246772479152425553
+      TEXTS START_114: 5144299128716215078
+      TEXTS START_115: 6932154532830624094
+      TEXTS START_116: 6189502582420751208
+      TEXTS START_117: -7530594166222934766
+      TEXTS START_118: -7088936655000501447
+      TEXTS START_119: 5854537425181993303
+      TEXTS START_12: 9110537959688247435
+      TEXTS START_120: 3644217264215773889
+      TEXTS START_121: 7241709341228896365
+      TEXTS START_122: -5335556343193714997
+      TEXTS START_123: -8060141762035190163
+      TEXTS START_124: -8886207361584923190
+      TEXTS START_125: -7298698349153901333
+      TEXTS START_126: 39083635166621511
+      TEXTS START_127: 4301613497653843779
+      TEXTS START_128: -5658537337298139474
+      TEXTS START_129: 2778326087888958922
+      TEXTS START_13: 834081884047101375
+      TEXTS START_130: -3309349316817091216
+      TEXTS START_131: -2470173828386211767
+      TEXTS START_132: -7421845047448468019
+      TEXTS START_133: -2275693979673846388
+      TEXTS START_134: -2771831461083688095
+      TEXTS START_135: -2916929748260135444
+      TEXTS START_136: -8662208102856781721
+      TEXTS START_14: 2494199821278836690
+      TEXTS START_15: -8186024812309692955
+      TEXTS START_16: -4940252827035944783
+      TEXTS START_17: 5226342896512502982
+      TEXTS START_18: -4886878267542534749
+      TEXTS START_19: -5066956508689717371
+      TEXTS START_2: 8033405893291855005
+      TEXTS START_20: -2471985387852421731
+      TEXTS START_21: -3085760129189187425
+      TEXTS START_22: -5577320085760809084
+      TEXTS START_23: -5229987547281977607
+      TEXTS START_24: 1053759141190394448
+      TEXTS START_25: 8599785551581829994
+      TEXTS START_26: -3312495962523855025
+      TEXTS START_27: 2068227569869930539
+      TEXTS START_28: 6476558844929540841
+      TEXTS START_29: -6156422419313553876
+      TEXTS START_3: -6503394371880759581
+      TEXTS START_30: -8911943049718773172
+      TEXTS START_31: -1990346093955036237
+      TEXTS START_32: 2550705828715530148
+      TEXTS START_33: 4089302526344630566
+      TEXTS START_34: 4406178969346761199
+      TEXTS START_35: -1494387233109328408
+      TEXTS START_36: -5800301584518907019
+      TEXTS START_37: 7135019949729921635
+      TEXTS START_38: 2770561119367171294
+      TEXTS START_39: 8718993167988639281
+      TEXTS START_4: -7159378006981980146
+      TEXTS START_40: 1436619544986164419
+      TEXTS START_41: 6570898560246725425
+      TEXTS START_42: 4141132363235966205
+      TEXTS START_43: 3473309596714351263
+      TEXTS START_44: -3519534424672097976
+      TEXTS START_45: -1394846623427699701
+      TEXTS START_46: -5633282590520836894
+      TEXTS START_47: 297540192944082008
+      TEXTS START_48: -5776789660634336500
+      TEXTS START_49: -744986672418011749
+      TEXTS START_5: 5890409537672526213
+      TEXTS START_50: -5116758773835956956
+      TEXTS START_51: -8333481945964734610
+      TEXTS START_52: -2214521018840092963
+      TEXTS START_53: 5117029781262638137
+      TEXTS START_54: -6214933086531045803
+      TEXTS START_55: -4392940422998054708
+      TEXTS START_56: 2314411396002965142
+      TEXTS START_57: -3311172493064887480
+      TEXTS START_58: 3624026479421876383
+      TEXTS START_59: 3291452089273390442
+      TEXTS START_6: -3924482632234794131
+      TEXTS START_60: 6501920670722967672
+      TEXTS START_61: 298318939781921512
+      TEXTS START_62: -5643459930489313648
+      TEXTS START_63: -1609724207460978905
+      TEXTS START_64: 754124487864766319
+      TEXTS START_65: -2645057121053456894
+      TEXTS START_66: -1491820849798485178
+      TEXTS START_67: 37333355345843366
+      TEXTS START_68: 281587597133544
+      TEXTS START_69: -250469785297269534
+      TEXTS START_7: -8357087289258601492
+      TEXTS START_70: -940903943967637597
+      TEXTS START_71: -5349367338824514171
+      TEXTS START_72: 3104901114136010046
+      TEXTS START_73: 2501458634340989846
+      TEXTS START_74: 1507226694509708038
+      TEXTS START_75: 941738887148481442
+      TEXTS START_76: 5396043642153278491
+      TEXTS START_77: -2346422174005380468
+      TEXTS START_78: -5545223406956011964
+      TEXTS START_79: -3631325614620605316
+      TEXTS START_8: 7702442538916630635
+      TEXTS START_80: -3689777278871286288
+      TEXTS START_81: -1511978195681762599
+      TEXTS START_82: -420514741580379790
+      TEXTS START_83: -3482287229465977696
+      TEXTS START_84: -8167018987166625557
+      TEXTS START_85: 198910407280012315
+      TEXTS START_86: -8825404793932242434
+      TEXTS START_87: 2594313078617391466
+      TEXTS START_88: 3953954235515249290
+      TEXTS START_89: 3887560105320276326
+      TEXTS START_9: -156406273036831687
+      TEXTS START_90: -8627227826122281744
+      TEXTS START_91: 7517774208321397363
+      TEXTS START_92: -3103563370584865148
+      TEXTS START_93: 6474990274495728068
+      TEXTS START_94: -8462503661389020253
+      TEXTS START_95: 6494931748750305648
+      TEXTS START_96: 5015230224674422882
+      TEXTS START_97: 1780833271633520550
+      TEXTS START_98: 8860094207998893641
+      TEXTS START_99: 8193895040335305068
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

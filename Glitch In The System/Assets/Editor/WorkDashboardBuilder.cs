@@ -6,7 +6,8 @@ using GlitchInTheSystem.UI;
 
 /// <summary>
 /// One-time scene builder for the Content Moderator / Work Dashboard UI.
-/// Generates normal uGUI objects you can freely edit afterward.
+/// After building, removes all automatic layout under <c>FloatingPanel</c> so every control is free
+/// <c>RectTransform</c> (Pos X/Y/Z, width, height). Use <see cref="ConvertWorkDashboardToFreeform"/> on older prefabs.
 /// </summary>
 public static class WorkDashboardBuilder
 {
@@ -79,7 +80,7 @@ public static class WorkDashboardBuilder
         so.FindProperty("target").objectReferenceValue = floatingPanel;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        // Body
+        // Body (layout runs once, then stripped for freeform — see end of this method)
         var body = CreateEmpty("Body", floatingPanel);
         SetFlexibleHeight(body, 1);
         var bodyH = Undo.AddComponent<HorizontalLayoutGroup>(body.gameObject);
@@ -91,7 +92,6 @@ public static class WorkDashboardBuilder
         bodyH.childForceExpandWidth = true;
         bodyH.childForceExpandHeight = true;
 
-        // LeftPanel
         var left = CreatePanel("LeftPanel", body, new Color(0.12f, 0.13f, 0.15f, 1f));
         SetPreferredWidth(left, 340);
         var leftV = Undo.AddComponent<VerticalLayoutGroup>(left.gameObject);
@@ -108,7 +108,6 @@ public static class WorkDashboardBuilder
         BuildStatsCard(left);
         BuildHistoryCard(left);
 
-        // RightPanel
         var right = CreatePanel("RightPanel", body, new Color(0.12f, 0.13f, 0.15f, 1f));
         SetFlexibleWidth(right, 1);
         var rightV = Undo.AddComponent<VerticalLayoutGroup>(right.gameObject);
@@ -146,6 +145,9 @@ public static class WorkDashboardBuilder
         SetFlexibleWidth(hint.rectTransform, 1);
 
         CreateTMP("DecisionResultText", bottom, "—", 16, TextAlignmentOptions.MidlineRight);
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(floatingPanel);
+        RemoveFreeformLayoutDriversUnder(floatingPanel);
 
         // Select the root for convenience.
         Selection.activeObject = root.gameObject;
@@ -248,11 +250,109 @@ public static class WorkDashboardBuilder
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        LayoutRebuilder.ForceRebuildLayoutImmediate(floatingPanel);
+        RemoveFreeformLayoutDriversUnder(floatingPanel);
+
         Undo.CollapseUndoOperations(group);
         EditorUtility.DisplayDialog(
             "Update Work Dashboard to Floating",
-            "Dashboard updated. The window is now draggable by the title bar.",
+            "Dashboard updated: draggable title bar, and all automatic layout under FloatingPanel was removed so every widget uses manual RectTransform (Pos X/Y/Z, width, height).",
             "OK");
+    }
+
+    /// <summary>
+    /// Same as <see cref="ConvertWorkDashboardToFreeform"/> — kept for menu discoverability.
+    /// </summary>
+    [MenuItem("Glitch In The System/UI/Unlock Work Dashboard Panel Sizes", false, 21)]
+    public static void UnlockWorkDashboardPanelSizes() => ConvertWorkDashboardToFreeform();
+
+    /// <summary>
+    /// Removes layout groups, LayoutElement, ContentSizeFitter, and AspectRatioFitter under the dashboard
+    /// so nothing overwrites Pos X/Y/Z, width, or height.
+    /// </summary>
+    [MenuItem("Glitch In The System/UI/Make Work Dashboard Freeform (Remove Layout Locks)", false, 22)]
+    public static void MakeWorkDashboardFreeformMenu() => ConvertWorkDashboardToFreeform();
+
+    public static void ConvertWorkDashboardToFreeform()
+    {
+        var root = GetSelectedWorkDashboardRoot();
+        if (root == null)
+        {
+            EditorUtility.DisplayDialog(
+                "Work Dashboard freeform",
+                "Select the WorkDashboardWindow in the Hierarchy, then run this again.",
+                "OK");
+            return;
+        }
+
+        var scope = FindFloatingPanel(root) as Transform ?? root;
+        var scopeRt = scope as RectTransform;
+        if (scopeRt == null)
+        {
+            EditorUtility.DisplayDialog(
+                "Work Dashboard freeform",
+                "Could not resolve a RectTransform scope for layout removal.",
+                "OK");
+            return;
+        }
+
+        Undo.IncrementCurrentGroup();
+        int group = Undo.GetCurrentGroup();
+        Undo.SetCurrentGroupName("Work Dashboard freeform (remove layout drivers)");
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(scopeRt);
+        RemoveFreeformLayoutDriversUnder(scope);
+
+        Undo.CollapseUndoOperations(group);
+        EditorUtility.DisplayDialog(
+            "Work Dashboard freeform",
+            "Removed all layout groups, LayoutElement, ContentSizeFitter, and AspectRatioFitter under this window. Use the Rect Tool and Rect Transform (including Pos Z / local Z) to place everything manually. ScrollRects are unchanged.",
+            "OK");
+    }
+
+    /// <summary>
+    /// Strips Unity UI layout drivers so child <see cref="RectTransform"/> values are no longer overwritten each frame.
+    /// </summary>
+    private static void RemoveFreeformLayoutDriversUnder(Transform scope)
+    {
+        if (scope == null) return;
+
+        void DestroyAll<T>() where T : Component
+        {
+            var arr = scope.GetComponentsInChildren<T>(true);
+            foreach (var c in arr)
+            {
+                if (c != null)
+                    Undo.DestroyObjectImmediate(c);
+            }
+        }
+
+        DestroyAll<LayoutGroup>();
+        DestroyAll<ContentSizeFitter>();
+        DestroyAll<LayoutElement>();
+        DestroyAll<AspectRatioFitter>();
+    }
+
+    private static RectTransform FindFloatingPanel(Transform dashboardRoot)
+    {
+        if (dashboardRoot == null) return null;
+        var direct = dashboardRoot.Find("FloatingPanel") as RectTransform;
+        if (direct != null) return direct;
+        return FindRectTransformChildByNameRecursive(dashboardRoot, "FloatingPanel");
+    }
+
+    private static RectTransform FindRectTransformChildByNameRecursive(Transform parent, string childName)
+    {
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            var c = parent.GetChild(i);
+            if (c.name == childName)
+                return c as RectTransform;
+            var nested = FindRectTransformChildByNameRecursive(c, childName);
+            if (nested != null)
+                return nested;
+        }
+        return null;
     }
 
     private static RectTransform GetSelectedWorkDashboardRoot()
