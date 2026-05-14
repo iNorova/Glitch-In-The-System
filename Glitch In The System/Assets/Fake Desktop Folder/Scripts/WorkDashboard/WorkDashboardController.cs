@@ -340,21 +340,8 @@ public sealed class WorkDashboardController : MonoBehaviour
             }
         }
 
-        if (decisionResultText != null)
-        {
-            if (useGameDatabase && _currentDbPost != null)
-            {
-                bool flagged = !overridden
-                              && !finalApproved
-                              && !string.IsNullOrEmpty(playerReason)
-                              && playerReason.StartsWith(ModerationDecisionFeedback.FlagReasonPrefix, StringComparison.Ordinal);
-                decisionResultText.text = flagged
-                    ? "Flagged"
-                    : ModerationDecisionFeedback.GetDashboardLine(finalApproved, overridden, _currentDbPost);
-            }
-            else
-                decisionResultText.text = overridden ? $"{(finalApproved ? "Approved" : "Declined")} (overridden)" : (finalApproved ? "Approved" : "Declined");
-        }
+        string lastAuthor = ResolveLastModeratedAuthorHandle();
+        string outcomeLine = BuildOutcomeLabelForCurrentPost(finalApproved, overridden, playerReason);
 
         AppendHistoryEntry(finalApproved, currentPerson, currentPost, overridden);
         currentIndex++;
@@ -364,6 +351,58 @@ public sealed class WorkDashboardController : MonoBehaviour
 
         UpdateTopBar();
         Next();
+        ApplyDecisionResultBanner(lastAuthor, outcomeLine);
+    }
+
+    /// <summary>Author for the post that was just decided (before queue advance).</summary>
+    private string ResolveLastModeratedAuthorHandle()
+    {
+        if (!string.IsNullOrEmpty(currentPerson.Username))
+            return currentPerson.Username;
+        if (!string.IsNullOrEmpty(currentPost.AuthorUsername))
+            return currentPost.AuthorUsername;
+        if (_currentDbUser != null && !string.IsNullOrEmpty(_currentDbUser.username))
+            return _currentDbUser.username;
+        return "user";
+    }
+
+    /// <summary>Short outcome line matching approve / decline / flag / algorithm override semantics.</summary>
+    private string BuildOutcomeLabelForCurrentPost(bool finalApproved, bool overridden, string playerReason)
+    {
+        if (useGameDatabase && _currentDbPost != null)
+        {
+            bool flagged = !overridden
+                           && !finalApproved
+                           && !string.IsNullOrEmpty(playerReason)
+                           && playerReason.StartsWith(ModerationDecisionFeedback.FlagReasonPrefix, StringComparison.Ordinal);
+            if (flagged)
+                return "Flagged";
+            return ModerationDecisionFeedback.GetDashboardLine(finalApproved, overridden, _currentDbPost);
+        }
+
+        return overridden
+            ? $"{(finalApproved ? "Approved" : "Declined")} (overridden)"
+            : (finalApproved ? "Approved" : "Declined");
+    }
+
+    /// <summary>
+    /// After <see cref="Next"/> loads the following post, clarify that the banner refers to the <b>previous</b> decision
+    /// and that the next item is already on screen (or that the session queue is finished).
+    /// </summary>
+    private void ApplyDecisionResultBanner(string lastAuthor, string outcomeLine)
+    {
+        if (decisionResultText == null) return;
+
+        string user = string.IsNullOrEmpty(lastAuthor) ? "user" : lastAuthor;
+        string last = $"Last: @{user} — {outcomeLine}";
+
+        if (currentIndex >= postsPerSession)
+        {
+            decisionResultText.text = $"{last}.\nAll queued posts reviewed for this session.";
+            return;
+        }
+
+        decisionResultText.text = $"{last}.\nNext post ready ({currentIndex + 1}/{postsPerSession}).";
     }
 
     private void Next()
