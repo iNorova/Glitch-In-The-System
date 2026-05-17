@@ -430,7 +430,7 @@ namespace GlitchInTheSystem.Intro
             var tmp = lblGo.AddComponent<TextMeshProUGUI>();
             tmp.fontSize = 22;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             bool bannerConsumedGuess = TutorialQueueMarkedComplete(GameDatabase.Instance);
             tmp.text = bannerConsumedGuess
                 ? "Continue to Day 1"
