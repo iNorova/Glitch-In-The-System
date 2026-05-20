@@ -22,5 +22,18 @@ namespace GlitchInTheSystem.GameData
 
         [Header("Algorithm")]
         public int algorithmPhase = 0; // 0=Helpful, 1=Authoritative, 2=Manipulative
+
+        [Header("Day 1 testing (other days not wired yet)")]
+        [Tooltip("When enabled, Day 1 uses the test chances below instead of zero interference.")]
+        public bool day1EnableAlgorithmTest = false;
+        [Range(0, 2)] public int day1TestPhase = 1;
+        [Range(0f, 1f)] public float day1TestOverrideChance = 0.25f;
+        [Range(0f, 1f)] public float day1TestRewriteChance = 0.4f;
+        [Tooltip("Scales override/rewrite rolls on Day 1 while testing (1 = full strength).")]
+        [Range(0.05f, 1.5f)] public float day1TestHostilityMultiplier = 1f;
+
+        [Header("Moderation content")]
+        [Tooltip("Optional pool of realistic posts (edit in Project without Play mode).")]
+        public ModerationContentLibrary moderationContentLibrary;
     }
 }

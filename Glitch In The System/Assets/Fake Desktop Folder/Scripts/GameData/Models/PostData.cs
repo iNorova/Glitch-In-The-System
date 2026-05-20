@@ -18,6 +18,12 @@ namespace GlitchInTheSystem.GameData
         public int shares;
         public int comments;
         public string mediaSpriteId; // optional
+        /// <summary>Human report copy shown in Work Dashboard (may be vague, detailed, or false).</summary>
+        public string reportReason;
+        /// <summary>Caption for attached image/media when <see cref="presentationFormat"/> includes media.</summary>
+        public string imageDescription;
+        public PostPresentationFormat presentationFormat;
+        public FeedPostKind feedKind;
         public PostCategory category; // Harmless, Violation, Misinformation, GrayArea, Narrative, AlgorithmManipulation
         public int severity;          // 0–3 for moderation priority
         public bool wasRewrittenByAlgorithm;

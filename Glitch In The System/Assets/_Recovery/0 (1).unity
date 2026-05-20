@@ -1161,8 +1161,6 @@ MonoBehaviour:
   welcomeContinueButton: {fileID: 806619048}
   tutorialHintPanel: {fileID: 1583995449}
   tutorialHintText: {fileID: 2130860009}
-  tutorialOutroFadeSeconds: 0.5
-  tutorialOutroHoldSeconds: 1.35
   dayCardPanel: {fileID: 1383377909}
   dayCardText: {fileID: 2131543685}
   dayCardHoldSeconds: 1
@@ -2675,7 +2673,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GlitchInTheSystem.GameData.GameBootstrap
   config: {fileID: 11400000, guid: f4cb1be6870e1c348a9b2caf212b0a60, type: 2}
-  algorithmTrustSettings: {fileID: 11400000, guid: bd0b8efa1d007c74a9e5dbc5421a35ca, type: 2}
   forceStartAtDayOneOnBoot: 1
 --- !u!4 &477658164
 Transform:
@@ -13554,7 +13551,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1846147191
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14536,7 +14533,6 @@ MonoBehaviour:
   postUserText: {fileID: 712368624}
   timestampText: {fileID: 1492746745}
   postText: {fileID: 1669252384}
-  reportReasonText: {fileID: 0}
   engagementRowText: {fileID: 1692138739}
   approveButton: {fileID: 881239048}
   declineButton: {fileID: 774313682}
@@ -14545,8 +14541,6 @@ MonoBehaviour:
   dayTransitionPanel: {fileID: 0}
   dayTransitionText: {fileID: 0}
   dayTransitionProceedButton: {fileID: 0}
-  dayShiftFadeSeconds: 0.55
-  dayShiftHoldSeconds: 2.1
   decisionHistoryContent: {fileID: 0}
   decisionHistoryScrollRect: {fileID: 0}
   postsPerSession: 10

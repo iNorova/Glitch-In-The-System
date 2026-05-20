@@ -6,6 +6,20 @@ namespace GlitchInTheSystem.Social
     /// <summary>Shared feed card copy/colors — used by post views and preview data.</summary>
     public static class SocialMediaFeedPresentation
     {
+        public static string FeedKindLabel(FeedPostKind kind)
+        {
+            return kind switch
+            {
+                FeedPostKind.PersonalUpdate => "Update",
+                FeedPostKind.NewsRepost => "Repost",
+                FeedPostKind.Meme => "Meme",
+                FeedPostKind.EmotionalVent => "Vent",
+                FeedPostKind.SponsoredAd => "Ad",
+                FeedPostKind.ViralClip => "Viral",
+                _ => string.Empty
+            };
+        }
+
         public static string CategoryLabel(PostCategory category)
         {
             return category switch
@@ -57,9 +71,27 @@ namespace GlitchInTheSystem.Social
                         i++;
                     continue;
                 }
+
+                if (!IsSafeForGameFont(ch))
+                    continue;
+
                 sb.Append(ch);
             }
+
             return sb.ToString();
+        }
+
+        /// <summary>Pixeboy-style TMP assets are ASCII-first; drop emoji and symbol blocks that spam missing-glyph warnings.</summary>
+        private static bool IsSafeForGameFont(char ch)
+        {
+            if (ch == '\n' || ch == '\r' || ch == '\t') return true;
+            if (ch < 128) return true;
+            // Latin-1 supplement + Latin extended-A (accents in names/copy).
+            if (ch is >= '\u00A0' and <= '\u024F') return true;
+            // Common punctuation used in post copy.
+            if (ch is '\u2013' or '\u2014' or '\u2018' or '\u2019' or '\u201C' or '\u201D' or '\u2026')
+                return true;
+            return false;
         }
     }
 }

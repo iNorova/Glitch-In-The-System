@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using UnityEngine.InputSystem;
 #endif
 using GlitchInTheSystem.GameData;
+using GlitchInTheSystem.UI;
 
 namespace GlitchInTheSystem.Intro
 {
@@ -37,6 +38,10 @@ namespace GlitchInTheSystem.Intro
         [Header("Tutorial UI")]
         [SerializeField] private GameObject tutorialHintPanel;
         [SerializeField] private TMP_Text tutorialHintText;
+
+        [Header("Post-tutorial transition")]
+        [SerializeField] private float tutorialOutroFadeSeconds = 0.5f;
+        [SerializeField] private float tutorialOutroHoldSeconds = 1.35f;
 
         [Header("Day 1 UI")]
         [SerializeField] private GameObject dayCardPanel;
@@ -208,6 +213,7 @@ namespace GlitchInTheSystem.Intro
             yield return RunBootSequence();
             yield return RunWelcome();
             yield return RunTutorialPosts();
+            yield return RunTutorialCompleteTransition();
             yield return RunDayCard();
 
             MarkIntroSeen();
@@ -315,8 +321,13 @@ namespace GlitchInTheSystem.Intro
                     db = GameDatabase.Instance;
                 }
 
-                // Small pause so the last decision feedback is readable.
-                yield return new WaitForSecondsRealtime(0.35f);
+                if (tutorialHintText != null)
+                {
+                    tutorialHintText.text =
+                        "<b>Tutorial complete</b>\n<size=22>Nice work — loading your first live day...</size>";
+                }
+
+                yield return new WaitForSecondsRealtime(0.55f);
             }
             finally
             {
@@ -449,21 +460,56 @@ namespace GlitchInTheSystem.Intro
             _tutorialProceedHudRoot = null;
         }
 
+        private IEnumerator RunTutorialCompleteTransition()
+        {
+            workDashboard?.CancelDayShiftTransition();
+            CloseWorkDashboardForIntroHandoff();
+            SetIntroOverlayBlocksRaycasts(true);
+
+            if (tutorialHintPanel != null)
+                tutorialHintPanel.SetActive(false);
+
+            ShowOnly(dayCardPanel);
+            PrepareDayCardPanelForFade();
+
+            if (dayCardText != null)
+            {
+                dayCardText.enableAutoSizing = false;
+                dayCardText.fontSize = 40;
+                dayCardText.color = Color.white;
+                dayCardText.text =
+                    "<size=48><b>Tutorial complete</b></size>\n\n<size=24><alpha=#CC>Preparing Day 1...</alpha></size>";
+            }
+
+            CanvasGroup group = ScreenFadeUtility.EnsureCanvasGroup(dayCardPanel);
+            if (group != null)
+            {
+                group.ignoreParentGroups = true;
+                group.alpha = 0f;
+                yield return ScreenFadeUtility.Fade(group, 1f, tutorialOutroFadeSeconds);
+            }
+
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.4f, tutorialOutroHoldSeconds));
+
+            if (group != null && tutorialOutroFadeSeconds > 0.01f)
+                yield return ScreenFadeUtility.Fade(group, 0f, tutorialOutroFadeSeconds * 0.85f);
+        }
+
         private IEnumerator RunDayCard()
         {
             CloseWorkDashboardForIntroHandoff();
 
             SetIntroOverlayBlocksRaycasts(true);
             ShowOnly(dayCardPanel);
-            ApplyDayTransitionFullBleed();
+            PrepareDayCardPanelForFade();
 
-            CanvasGroup cardGroup = EnsureCanvasGroup(dayCardPanel);
+            CanvasGroup cardGroup = ScreenFadeUtility.EnsureCanvasGroup(dayCardPanel);
             if (cardGroup != null)
                 cardGroup.ignoreParentGroups = true;
             if (cardGroup != null && dayCardFadeInSeconds > 0.01f)
             {
                 cardGroup.alpha = 0f;
-                yield return FadeCanvasGroupAlpha(cardGroup, 1f, dayCardFadeInSeconds);
+                yield return ScreenFadeUtility.Fade(cardGroup, 1f, dayCardFadeInSeconds);
             }
             else if (cardGroup != null)
                 cardGroup.alpha = 1f;
@@ -473,14 +519,14 @@ namespace GlitchInTheSystem.Intro
                 dayCardText.enableAutoSizing = false;
                 dayCardText.fontSize = 42;
                 dayCardText.color = Color.white;
-                dayCardText.text = "<size=52><b>DAY 1</b></size>\n\n<size=26>Beginning live moderation queue.\nYou'll keep using the same tools.</size>";
+                dayCardText.text =
+                    "<size=56><b>DAY 1</b></size>\n\n<size=26>Beginning live moderation.\nSame tools — real queue.</size>";
             }
 
             yield return new WaitForSecondsRealtime(Mathf.Max(0.5f, dayCardHoldSeconds));
 
-            // Quick fade before gameplay handoff.
             if (cardGroup != null && dayCardFadeInSeconds > 0.01f)
-                yield return FadeCanvasGroupAlpha(cardGroup, 0f, dayCardFadeInSeconds * 0.75f);
+                yield return ScreenFadeUtility.Fade(cardGroup, 0f, dayCardFadeInSeconds * 0.75f);
         }
 
         private void MarkIntroSeen()
@@ -556,13 +602,15 @@ namespace GlitchInTheSystem.Intro
 
             // decisionsMade is "completed so far", so next index is decisionsMade.
             int next = Mathf.Clamp(decisionsMade, 0, IntroTutorialContent.TutorialPostCount - 1);
+            int step = next + 1;
+            string progress = $"<alpha=#99>{step} / {IntroTutorialContent.TutorialPostCount}</alpha>";
             tutorialHintText.text = next switch
             {
-                0 => "<b>Tutorial</b>\nThis is a normal, harmless post.\nClick <b>APPROVE</b> to publish it.",
-                1 => "<b>Tutorial</b>\nThis looks like spam/scam.\nClick <b>REMOVE</b> (Decline) to block it.",
-                2 => "<b>Tutorial</b>\nHarmless content keeps the feed alive.\nClick <b>APPROVE</b>.",
-                3 => "<b>Tutorial</b>\nNot sure? Escalate it.\nClick <b>FLAG</b> (or Remove if Flag isn’t available).",
-                _ => "<b>Tutorial</b>\nThis one isn’t obvious.\nUse your best judgement — you’ll see more like this later."
+                0 => $"{progress}\n<b>Harmless post</b>\nClick <b>APPROVE</b> to publish.",
+                1 => $"{progress}\n<b>Spam / scam</b>\nClick <b>REMOVE</b> to block it.",
+                2 => $"{progress}\n<b>Another safe post</b>\nClick <b>APPROVE</b> again.",
+                3 => $"{progress}\n<b>Uncertain case</b>\nClick <b>FLAG</b> to escalate (or Remove).",
+                _ => $"{progress}\n<b>Gray area</b>\nUse your judgement — real days get trickier."
             };
         }
 
@@ -575,8 +623,6 @@ namespace GlitchInTheSystem.Intro
                 "Connecting to Central Feed...",
                 "Loading user safety protocols...",
                 "Verifying workstation policies...",
-                "Calibrating display profile...",
-                "Syncing queue cache...",
                 "<alpha=#88>Diagnostic: minor signal variance detected</alpha>",
                 "Launching Work Dashboard...",
                 "Ready."
@@ -651,61 +697,13 @@ namespace GlitchInTheSystem.Intro
             _introRootCanvasGroup.blocksRaycasts = blockRaycasts;
         }
 
-        private static CanvasGroup EnsureCanvasGroup(GameObject go)
-        {
-            if (go == null) return null;
-            CanvasGroup cg = go.GetComponent<CanvasGroup>();
-            if (cg == null) cg = go.AddComponent<CanvasGroup>();
-            return cg;
-        }
-
-        private static IEnumerator FadeCanvasGroupAlpha(CanvasGroup cg, float endAlpha, float duration)
-        {
-            if (cg == null)
-                yield break;
-
-            float start = cg.alpha;
-            endAlpha = Mathf.Clamp01(endAlpha);
-            if (duration <= 0f)
-            {
-                cg.alpha = endAlpha;
-                yield break;
-            }
-
-            float t = 0f;
-            while (t < duration)
-            {
-                t += Time.unscaledDeltaTime;
-                cg.alpha = Mathf.Lerp(start, endAlpha, Mathf.Clamp01(t / duration));
-                yield return null;
-            }
-
-            cg.alpha = endAlpha;
-        }
-
-        private void ApplyDayTransitionFullBleed()
+        private void PrepareDayCardPanelForFade()
         {
             if (dayCardPanel == null) return;
 
             var rt = dayCardPanel.transform as RectTransform;
-            if (rt != null)
-            {
-                rt.anchorMin = Vector2.zero;
-                rt.anchorMax = Vector2.one;
-                rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.offsetMin = Vector2.zero;
-                rt.offsetMax = Vector2.zero;
-                rt.anchoredPosition = Vector2.zero;
-            }
-
             var img = dayCardPanel.GetComponent<Image>();
-            if (img != null)
-            {
-                img.color = new Color(0f, 0f, 0f, 1f);
-                img.raycastTarget = true;
-            }
-
-            dayCardPanel.transform.SetAsLastSibling();
+            ScreenFadeUtility.ApplyFullBleed(rt, img);
         }
 
         private void CloseWorkDashboardForIntroHandoff()

@@ -28,7 +28,11 @@ namespace GlitchInTheSystem.GameData
         private readonly List<LogEntry> _logs = new();
 
         private int _queueIndex;
+        private bool _isIntroTutorialSession;
         private readonly System.Random _rng = new();
+
+        /// <summary>True while the onboarding tutorial queue is active (not a real day).</summary>
+        public bool IsIntroTutorialSession => _isIntroTutorialSession;
 
         /// <summary>Story flags (e.g. whether viral misinformation reached the public feed).</summary>
         public NarrativeState Narrative { get; } = new NarrativeState();
@@ -53,7 +57,7 @@ namespace GlitchInTheSystem.GameData
                 return;
             }
             Instance = this;
-            DontDestroyOnLoad(gameObject);
+            RuntimePersistency.Adopt(gameObject);
         }
 
         private void OnDestroy()
@@ -66,6 +70,7 @@ namespace GlitchInTheSystem.GameData
         /// </summary>
         public void InitializeSession()
         {
+            _isIntroTutorialSession = false;
             _users.Clear();
             _posts.Clear();
             _moderationQueue.Clear();
@@ -76,6 +81,7 @@ namespace GlitchInTheSystem.GameData
 
             DayPacing.ResetSessionState();
             DayPacing.ApplySessionStartPlayerPrefs(config);
+            AlgorithmManager.Instance?.ResetSessionState();
             DayPacing.ApplyProfile(config, AlgorithmDirector.Instance);
 
             int postsToGenerate = config != null ? config.postsPerDay : 10;
@@ -90,6 +96,7 @@ namespace GlitchInTheSystem.GameData
         /// </summary>
         public void InitializeIntroTutorialSession()
         {
+            _isIntroTutorialSession = true;
             _users.Clear();
             _posts.Clear();
             _moderationQueue.Clear();
@@ -293,6 +300,7 @@ namespace GlitchInTheSystem.GameData
             post.shares = Mathf.Max(0, post.shares + sharesDelta);
             post.comments = Mathf.Max(0, post.comments + commentsDelta);
             PostManager.RefreshEngagementLabel(post);
+            GlitchInTheSystem.Algorithm.AlgorithmPostAlteredNotifier.Notify(post, rewrite: false);
         }
 
         private void GenerateUsersAndPosts(int count)
@@ -365,37 +373,45 @@ namespace GlitchInTheSystem.GameData
                 _moderationQueue.Add(samplePosts[s]);
             }
 
+            var library = config != null ? config.moderationContentLibrary : null;
+
             for (int i = sampleCount; i < count; i++)
             {
                 var author = _users[_rng.Next(_users.Count)];
-                var (text, category) = postTemplates[_rng.Next(postTemplates.Length)];
-                int likes = WeightedInt(0, 40_000, 5);
-                int shares = WeightedInt(0, 10_000, 5);
-                int comments = WeightedInt(0, 5_000, 5);
+                PostData post;
 
-                // Severity based on category
-                int severity = category switch
+                if (library != null && library.preferPoolEntriesForProceduralDays
+                    && _rng.NextDouble() < library.poolEntryBlendChance
+                    && ModerationContentPools.AllQueueEntries.Count > 0)
                 {
-                    PostCategory.Misinformation => _rng.Next(1, 4),
-                    PostCategory.Violation => _rng.Next(2, 4),
-                    PostCategory.Narrative => _rng.Next(1, 3),
-                    _ => _rng.Next(0, 3)
-                };
+                    var entry = ModerationContentPools.AllQueueEntries[_rng.Next(ModerationContentPools.AllQueueEntries.Count)];
+                    post = ModerationContentPools.BuildPostFromEntry(entry, author, $"p_{i}", _rng);
+                }
+                else
+                {
+                    var (text, category) = postTemplates[_rng.Next(postTemplates.Length)];
+                    int severity = category switch
+                    {
+                        PostCategory.Misinformation => _rng.Next(1, 4),
+                        PostCategory.Violation => _rng.Next(2, 4),
+                        PostCategory.Narrative => _rng.Next(1, 3),
+                        _ => _rng.Next(0, 3)
+                    };
 
-                var post = new PostData
-                {
-                    id = $"p_{i}",
-                    authorUserId = author.id,
-                    text = text,
-                    timestampLabel = $"{_rng.Next(1, 23)}h",
-                    likes = likes,
-                    shares = shares,
-                    comments = comments,
-                    category = category,
-                    severity = severity,
-                    isPublished = false
-                };
-                PostManager.AssignDefaultBranches(post, _rng);
+                    post = new PostData
+                    {
+                        id = $"p_{i}",
+                        authorUserId = author.id,
+                        text = text,
+                        timestampLabel = $"{_rng.Next(1, 23)}h",
+                        category = category,
+                        severity = severity,
+                        isPublished = false,
+                        presentationFormat = PostPresentationFormat.TextOnly
+                    };
+                    OrganicEngagementUtility.ApplyToPost(post, _rng, category);
+                    PostManager.AssignDefaultBranches(post, _rng);
+                }
                 _posts.Add(post);
                 _moderationQueue.Add(post);
             }

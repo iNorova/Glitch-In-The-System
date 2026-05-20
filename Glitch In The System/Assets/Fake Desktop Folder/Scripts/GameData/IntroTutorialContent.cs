@@ -73,7 +73,7 @@ namespace GlitchInTheSystem.GameData
                 Mk(
                     id: "intro_p_02",
                     authorUserId: A(users, 2),
-                    text: "CONGRATS!! You won a free phone 🎉 Click here to claim: flairl1ne-gifts[dot]com",
+                    text: "CONGRATS!! You won a free phone! Click here to claim: flairl1ne-gifts[dot]com",
                     time: "5m",
                     category: PostCategory.Violation,
                     severity: 2,

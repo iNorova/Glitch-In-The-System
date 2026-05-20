@@ -1,7 +1,9 @@
+using GlitchInTheSystem.Algorithm;
+using GlitchInTheSystem.GameData;
+using GlitchInTheSystem.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using GlitchInTheSystem.GameData;
 
 namespace GlitchInTheSystem.Social
 {
@@ -13,12 +15,20 @@ namespace GlitchInTheSystem.Social
             if (cardRoot == null || post == null) return;
 
             SetText(cardRoot, "AuthorText", user != null ? $"{user.displayName}  @{user.username}" : $"@{post.authorUserId}");
-            SetText(cardRoot, "CategoryTag", SocialMediaFeedPresentation.CategoryLabel(post.category));
+
+            string kind = SocialMediaFeedPresentation.FeedKindLabel(post.feedKind);
+            string tag = string.IsNullOrEmpty(kind)
+                ? SocialMediaFeedPresentation.CategoryLabel(post.category)
+                : $"{kind} · {SocialMediaFeedPresentation.CategoryLabel(post.category)}";
+            SetText(cardRoot, "CategoryTag", tag);
             var categoryTag = FindTmp(cardRoot, "CategoryTag");
             if (categoryTag != null)
                 categoryTag.color = SocialMediaFeedPresentation.CategoryColor(post.category);
 
-            SetText(cardRoot, "BodyText", SocialMediaFeedPresentation.SanitizeForTMP(post.text));
+            string body = SocialMediaFeedPresentation.SanitizeForTMP(post.text);
+            if (!string.IsNullOrWhiteSpace(post.imageDescription))
+                body += $"\n\n[Image: {SocialMediaFeedPresentation.SanitizeForTMP(post.imageDescription)}]";
+            SetText(cardRoot, "BodyText", body);
             SetText(cardRoot, "EngagementText", post.EngagementDisplay);
             SetText(cardRoot, "TimeText", post.timestampLabel);
 
@@ -97,6 +107,31 @@ namespace GlitchInTheSystem.Social
             if (!Application.isPlaying && cardRoot.GetComponent<SocialMediaFeedEditorPost>() != null)
                 SocialMediaFeedEditorUtility.ForcePostVisible(cardRoot as RectTransform);
 #endif
+        }
+
+        /// <summary>Brief corrupted flash when algorithm touched this post. Call after layout (e.g. next frame).</summary>
+        public static void FlashAlterationGlitch(Transform cardRoot, PostData post, bool emphasizeRewrite = false)
+        {
+            if (cardRoot == null || post == null) return;
+
+            var body = FindTmp(cardRoot, "BodyText");
+            var engagement = FindTmp(cardRoot, "EngagementText");
+            var state = FindTmp(cardRoot, "StateText");
+
+            bool manipulated = AlgorithmManager.Instance != null
+                && AlgorithmManager.Instance.TryGetManipulatedPost(post.id, out _);
+
+            bool rewrite = emphasizeRewrite || post.wasRewrittenByAlgorithm;
+            if (rewrite && body != null)
+                AlgorithmGlitchHighlight.FlashTmpAfterLayout(body, isRewrite: true, frameDelay: 1);
+
+            if (manipulated)
+            {
+                if (engagement != null)
+                    AlgorithmGlitchHighlight.FlashTmpAfterLayout(engagement, isRewrite: false, frameDelay: 1);
+                if (state != null && state.gameObject.activeSelf)
+                    AlgorithmGlitchHighlight.FlashTmpAfterLayout(state, isRewrite: false, frameDelay: 1);
+            }
         }
 
         private static void SetText(Transform root, string childName, string value)

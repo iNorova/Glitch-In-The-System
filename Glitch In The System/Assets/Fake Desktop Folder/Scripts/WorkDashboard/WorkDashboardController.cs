@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using GlitchInTheSystem.GameData;
 using GlitchInTheSystem.Algorithm;
+using GlitchInTheSystem.Social;
 using GlitchInTheSystem.UI;
 
 public sealed class WorkDashboardController : MonoBehaviour
@@ -45,6 +47,7 @@ public sealed class WorkDashboardController : MonoBehaviour
     [SerializeField] private TMP_Text postUserText;
     [SerializeField] private TMP_Text timestampText;
     [SerializeField] private TMP_Text postText;
+    [SerializeField] private TMP_Text reportReasonText;
     [SerializeField] private TMP_Text engagementRowText;
 
     [Header("Decision")]
@@ -58,6 +61,8 @@ public sealed class WorkDashboardController : MonoBehaviour
     [SerializeField] private RectTransform dayTransitionPanel;
     [SerializeField] private TMP_Text dayTransitionText;
     [SerializeField] private Button dayTransitionProceedButton;
+    [SerializeField] private float dayShiftFadeSeconds = 0.55f;
+    [SerializeField] private float dayShiftHoldSeconds = 2.1f;
 
     [Header("Decision history")]
     [Tooltip("Content transform under a ScrollRect where entries will be appended.")]
@@ -79,8 +84,11 @@ public sealed class WorkDashboardController : MonoBehaviour
     private PostData _currentDbPost;
     private int _pendingCompletedDay = -1;
     private int _pendingNextDay = -1;
+    private bool _dayShiftPlaying;
+    private Coroutine _dayShiftRoutine;
 
     private readonly System.Random rng = new();
+    private WorkDashboardAlgorithmUI _algorithmUi;
 
     /// <summary>Set by <see cref="GlitchInTheSystem.Intro.IntroManager"/> so opening the inactive window doesn't run <see cref="StartSession"/> before the tutorial queue exists.</summary>
     private bool _suppressStartSessionOnce;
@@ -119,9 +127,28 @@ public sealed class WorkDashboardController : MonoBehaviour
     {
         AutoBindByName();
         EnsureWindowFocusHandler();
+        _algorithmUi = GetComponent<WorkDashboardAlgorithmUI>();
+        if (_algorithmUi == null)
+            _algorithmUi = gameObject.AddComponent<WorkDashboardAlgorithmUI>();
+
+        AlgorithmPostAlteredNotifier.PostAltered += OnAlgorithmPostAltered;
 
         WireButtonsIfPresent();
         LogMissingBindingsOnce();
+    }
+
+    private void OnDestroy()
+    {
+        AlgorithmPostAlteredNotifier.PostAltered -= OnAlgorithmPostAltered;
+    }
+
+    private void OnAlgorithmPostAltered(PostData post, bool rewrite)
+    {
+        if (post == null || _currentDbPost == null || post.id != _currentDbPost.id) return;
+
+        _algorithmUi?.OnPostTextAltered(postText, rewrite);
+        currentPost = MapPost(post, _currentDbUser);
+        Render();
     }
 
     private void OnEnable()
@@ -178,13 +205,16 @@ public sealed class WorkDashboardController : MonoBehaviour
             int qCount = db.ModerationQueueCount;
             postsPerSession = qCount > 0 ? qCount : (db.Config != null ? db.Config.postsPerDay : 10);
 
-            // Finished all items in this loaded queue → day-transition modal (avoid comparing to config-only length).
-            if (db.Posts.Count > 0 && qCount > 0 && db.GetDecisionsCount() >= qCount)
+            // Finished all items in this loaded queue → day shift (skip during intro tutorial — IntroManager owns that handoff).
+            if (!db.IsIntroTutorialSession
+                && db.Posts.Count > 0
+                && qCount > 0
+                && db.GetDecisionsCount() >= qCount)
             {
                 int nextDay = dayNumber + 1;
                 _pendingCompletedDay = dayNumber;
                 _pendingNextDay = nextDay;
-                ShowDayTransitionPanel(_pendingCompletedDay, _pendingNextDay);
+                BeginDayShiftTransition(_pendingCompletedDay, _pendingNextDay);
                 return;
             }
 
@@ -243,25 +273,133 @@ public sealed class WorkDashboardController : MonoBehaviour
         Next();
     }
 
-    private void ShowDayTransitionPanel(int completedDay, int nextDay)
+    private void BeginDayShiftTransition(int completedDay, int nextDay)
     {
+        if (_dayShiftPlaying) return;
+
+        _pendingCompletedDay = completedDay;
+        _pendingNextDay = nextDay;
+
+        if (_dayShiftRoutine != null)
+            StopCoroutine(_dayShiftRoutine);
+
+        _dayShiftRoutine = StartCoroutine(PlayDayShiftTransition(completedDay, nextDay));
+    }
+
+    private IEnumerator PlayDayShiftTransition(int completedDay, int nextDay)
+    {
+        _dayShiftPlaying = true;
         EnsureDayTransitionPanel();
-        if (dayTransitionPanel == null) return;
+        if (dayTransitionPanel == null)
+        {
+            _dayShiftPlaying = false;
+            ProceedToNextDay();
+            yield break;
+        }
+
+        ConfigureDayShiftOverlayCinematic(true);
+        ScreenFadeUtility.ApplyFullBleed(dayTransitionPanel, dayTransitionPanel.GetComponent<Image>());
 
         if (dayTransitionText != null)
-            dayTransitionText.text = $"<size=34><b>DAY {completedDay} COMPLETE</b></size>\n\nYou reviewed all queued posts for Day {completedDay}.\nPress <b>Proceed</b> to start Day {nextDay}.";
+        {
+            dayTransitionText.fontSize = 36;
+            dayTransitionText.alignment = TextAlignmentOptions.Center;
+            dayTransitionText.text =
+                $"<size=58><b>DAY {nextDay}</b></size>\n\n<size=24><alpha=#BB>Day {completedDay} complete.</alpha></size>";
+        }
 
+        CanvasGroup group = ScreenFadeUtility.EnsureCanvasGroup(dayTransitionPanel.gameObject);
+        group.alpha = 0f;
         dayTransitionPanel.gameObject.SetActive(true);
+        dayTransitionPanel.SetAsLastSibling();
+
+        yield return ScreenFadeUtility.Fade(group, 1f, dayShiftFadeSeconds);
+        yield return new WaitForSecondsRealtime(Mathf.Max(0.5f, dayShiftHoldSeconds));
+        yield return ScreenFadeUtility.Fade(group, 0f, dayShiftFadeSeconds);
+
+        dayTransitionPanel.gameObject.SetActive(false);
+        ConfigureDayShiftOverlayCinematic(false);
+        _dayShiftPlaying = false;
+        _dayShiftRoutine = null;
+
+        ProceedToNextDay();
+    }
+
+    private void ConfigureDayShiftOverlayCinematic(bool cinematic)
+    {
+        if (dayTransitionPanel == null) return;
+
+        var card = dayTransitionPanel.Find("Card");
+        if (card != null)
+            card.gameObject.SetActive(!cinematic);
+
+        if (dayTransitionProceedButton != null)
+            dayTransitionProceedButton.gameObject.SetActive(!cinematic);
+
+        if (dayTransitionText != null && cinematic)
+        {
+            var rt = dayTransitionText.rectTransform;
+            rt.SetParent(dayTransitionPanel, false);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(32f, 32f);
+            rt.offsetMax = new Vector2(-32f, -32f);
+            rt.anchoredPosition = Vector2.zero;
+        }
     }
 
     private void HideDayTransitionPanel()
     {
+        if (_dayShiftPlaying)
+            return;
+
+        if (_dayShiftRoutine != null)
+        {
+            StopCoroutine(_dayShiftRoutine);
+            _dayShiftRoutine = null;
+        }
+
         if (dayTransitionPanel != null)
             dayTransitionPanel.gameObject.SetActive(false);
     }
 
+    /// <summary>Stops an in-flight day-shift cinematic (e.g. when intro takes over after the tutorial queue).</summary>
+    public void CancelDayShiftTransition()
+    {
+        if (_dayShiftRoutine != null)
+        {
+            StopCoroutine(_dayShiftRoutine);
+            _dayShiftRoutine = null;
+        }
+
+        _dayShiftPlaying = false;
+        _pendingCompletedDay = -1;
+        _pendingNextDay = -1;
+
+        if (dayTransitionPanel != null)
+            dayTransitionPanel.gameObject.SetActive(false);
+
+        ConfigureDayShiftOverlayCinematic(false);
+    }
+
+    private void TryBeginDayShiftAfterQueueComplete()
+    {
+        if (!useGameDatabase || GameDatabase.Instance == null || _dayShiftPlaying) return;
+
+        var db = GameDatabase.Instance;
+        if (db.IsIntroTutorialSession) return;
+        int qCount = db.ModerationQueueCount;
+        if (qCount <= 0 || db.GetDecisionsCount() < qCount) return;
+
+        int completed = dayNumber;
+        int next = dayNumber + 1;
+        BeginDayShiftTransition(completed, next);
+    }
+
     private void ProceedToNextDay()
     {
+        if (_dayShiftPlaying) return;
+
         if (!useGameDatabase || GameDatabase.Instance == null)
         {
             HideDayTransitionPanel();
@@ -304,6 +442,8 @@ public sealed class WorkDashboardController : MonoBehaviour
         if (!EnsureReady()) return;
         if (currentIndex >= postsPerSession) return;
 
+        _algorithmUi?.OnPostClosed();
+
         bool finalApproved = playerApproved;
         bool overridden = false;
         string overrideReason = null;
@@ -320,6 +460,9 @@ public sealed class WorkDashboardController : MonoBehaviour
                 // If the algorithm didn't override, preserve playerReason (e.g. FLAG).
                 string recordReason = overridden ? overrideReason : playerReason;
                 GameDatabase.Instance.RecordDecision(_currentDbPost.id, _currentDbUser.id, finalApproved, playerApproved, overridden, recordReason);
+
+                AlgorithmManager.Instance?.OnModerationDecision(
+                    _currentDbPost.id, playerApproved, finalApproved, overridden);
 
                 if (finalApproved)
                     AlgorithmDirector.Instance.TryEngagementNudge(_currentDbPost.id);
@@ -411,6 +554,7 @@ public sealed class WorkDashboardController : MonoBehaviour
         {
             if (queueText != null) queueText.text = $"Queue: {postsPerSession} / {postsPerSession}";
             UpdateTopBar(final: true);
+            TryBeginDayShiftAfterQueueComplete();
             return;
         }
 
@@ -421,11 +565,13 @@ public sealed class WorkDashboardController : MonoBehaviour
             {
                 _currentDbUser = user;
                 _currentDbPost = post;
+                AlgorithmManager.Instance?.BeginPostReview(post.id);
                 if (AlgorithmDirector.Instance != null)
                     AlgorithmDirector.Instance.TryRewritePost(post);
 
                 currentPerson = MapUser(user);
                 currentPost = MapPost(post, user);
+                _algorithmUi?.OnPostDisplayed(post);
 
                 // Algorithm reacts to post content (contextual, content-aware)
                 if (AlgorithmDirector.Instance != null && AlgorithmNotification.Instance != null)
@@ -471,8 +617,33 @@ public sealed class WorkDashboardController : MonoBehaviour
         Set(queueText, $"Queue: {currentIndex + 1} / {postsPerSession}");
         Set(postUserText, $"@{currentPost.AuthorUsername}");
         Set(timestampText, currentPost.TimestampLabel);
-        Set(postText, currentPost.Text);
+        Set(postText, BuildPostBodyForDisplay(currentPost));
+        Set(reportReasonText, BuildReportLine(currentPost));
         Set(engagementRowText, $"Likes {currentPost.Likes:N0}  •  Shares {currentPost.Shares:N0}  •  Comments {currentPost.Comments:N0}");
+    }
+
+    private static string BuildPostBodyForDisplay(Post post)
+    {
+        var sb = new System.Text.StringBuilder();
+        if (!string.IsNullOrWhiteSpace(post.CategoryHint))
+            sb.AppendLine(post.CategoryHint);
+        sb.Append(SocialMediaFeedPresentation.SanitizeForTMP(post.Text ?? string.Empty));
+        if (!string.IsNullOrWhiteSpace(post.ImageDescription))
+        {
+            sb.Append("\n\n[Attached image: ")
+                .Append(SocialMediaFeedPresentation.SanitizeForTMP(post.ImageDescription))
+                .Append(']');
+        }
+
+        if (post.HasAttachedComments)
+            sb.Append("\n\n— Comments attached to this report (see thread in feed if approved) —");
+        return sb.ToString().Trim();
+    }
+
+    private static string BuildReportLine(Post post)
+    {
+        if (string.IsNullOrWhiteSpace(post.ReportReason)) return string.Empty;
+        return $"Report: {SocialMediaFeedPresentation.SanitizeForTMP(post.ReportReason)}";
     }
 
     private void UpdateTopBar(bool final = false)
@@ -547,6 +718,16 @@ public sealed class WorkDashboardController : MonoBehaviour
     private static Post MapPost(PostData p, UserProfileData author)
     {
         if (p == null) return default;
+        string categoryHint = p.category switch
+        {
+            PostCategory.GrayArea => "[Gray area — judgment call]",
+            PostCategory.Misinformation => "[Flagged: possible misinformation]",
+            PostCategory.Narrative => "[Narrative / speculation]",
+            PostCategory.Violation => "[Likely policy violation]",
+            PostCategory.AlgorithmManipulation => "[Meta / platform critique]",
+            _ => string.Empty
+        };
+
         return new Post
         {
             AuthorUsername = author?.username ?? p.authorUserId,
@@ -554,7 +735,11 @@ public sealed class WorkDashboardController : MonoBehaviour
             Text = p.text,
             Likes = p.likes,
             Shares = p.shares,
-            Comments = p.comments
+            Comments = p.comments,
+            ReportReason = p.reportReason,
+            ImageDescription = p.imageDescription,
+            CategoryHint = categoryHint,
+            HasAttachedComments = p.presentationFormat == PostPresentationFormat.TextWithAttachedComments
         };
     }
 
@@ -636,6 +821,7 @@ public sealed class WorkDashboardController : MonoBehaviour
         postUserText ??= FindTMP("PostUserText");
         timestampText ??= FindTMP("TimestampText");
         postText ??= FindTMP("PostText");
+        reportReasonText ??= FindTMP("ReportReasonText");
         engagementRowText ??= FindTMP("EngagementRow");
 
         approveButton ??= FindButton("ApproveButton");
@@ -927,6 +1113,10 @@ public sealed class WorkDashboardController : MonoBehaviour
         public int Likes;
         public int Shares;
         public int Comments;
+        public string ReportReason;
+        public string ImageDescription;
+        public string CategoryHint;
+        public bool HasAttachedComments;
     }
 }
 

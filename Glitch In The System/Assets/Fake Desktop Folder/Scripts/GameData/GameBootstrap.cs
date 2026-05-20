@@ -11,7 +11,9 @@ namespace GlitchInTheSystem.GameData
     public sealed class GameBootstrap : MonoBehaviour
     {
         [SerializeField] private GameDatabaseConfig config;
-    [Header("Session boot behavior")]
+        [SerializeField] private AlgorithmTrustSettings algorithmTrustSettings;
+
+        [Header("Session boot behavior")]
     [Tooltip("If true, every fresh game run starts at Day 1.")]
     [SerializeField] private bool forceStartAtDayOneOnBoot = true;
 
@@ -19,7 +21,7 @@ namespace GlitchInTheSystem.GameData
         {
             if (GameDatabase.Instance == null)
             {
-                var dbGo = new GameObject("GameDatabase");
+                var dbGo = CreateSystemObject("GameDatabase");
                 var db = dbGo.AddComponent<GameDatabase>();
                 if (config == null)
                 {
@@ -36,29 +38,58 @@ namespace GlitchInTheSystem.GameData
                 db.SetConfig(config);
             }
 
+            EnsureAlgorithmManager();
+
             if (AlgorithmDirector.Instance == null)
-            {
-                var dirGo = new GameObject("AlgorithmDirector");
-                dirGo.AddComponent<AlgorithmDirector>();
-            }
+                CreateSystemObject("AlgorithmDirector").AddComponent<AlgorithmDirector>();
 
             if (AlgorithmNotification.Instance == null)
-            {
-                var notifGo = new GameObject("AlgorithmNotification");
-                notifGo.AddComponent<AlgorithmNotification>();
-            }
+                CreateSystemObject("AlgorithmNotification").AddComponent<AlgorithmNotification>();
 
             if (GameManager.Instance == null)
-            {
-                var gmGo = new GameObject("GameManager");
-                gmGo.AddComponent<GameManager>();
-            }
+                CreateSystemObject("GameManager").AddComponent<GameManager>();
 
             // Runtime start menu behavior fixes:
             // - Start toggles open/close
             // - FL/W close start menu after launching app
             if (GetComponent<StartMenuController>() == null)
                 gameObject.AddComponent<StartMenuController>();
+
+            if (AlgorithmGlitchHighlight.Instance == null)
+                CreateSystemObject("AlgorithmGlitchHighlight").AddComponent<AlgorithmGlitchHighlight>();
+        }
+
+        public AlgorithmTrustSettings AlgorithmTrustSettings => algorithmTrustSettings;
+
+#if UNITY_EDITOR
+        public void SetAlgorithmTrustSettings(AlgorithmTrustSettings settings)
+        {
+            algorithmTrustSettings = settings;
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+#endif
+
+        private void EnsureAlgorithmManager()
+        {
+            AlgorithmManager manager = GetComponentInChildren<AlgorithmManager>(true);
+            if (manager == null)
+            {
+                if (AlgorithmManager.Instance != null)
+                    manager = AlgorithmManager.Instance;
+                else
+                    manager = CreateSystemObject("AlgorithmManager").AddComponent<AlgorithmManager>();
+            }
+
+            if (algorithmTrustSettings != null)
+                manager.ApplyTrustSettings(algorithmTrustSettings);
+        }
+
+        /// <summary>Spawns runtime systems under a DontDestroyOnLoad root (not under scene hierarchy).</summary>
+        private static GameObject CreateSystemObject(string objectName)
+        {
+            var go = new GameObject(objectName);
+            RuntimePersistency.Adopt(go);
+            return go;
         }
     }
 }

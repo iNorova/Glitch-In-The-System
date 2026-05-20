@@ -93,6 +93,12 @@ namespace GlitchInTheSystem.Algorithm
         /// </summary>
         public static string DecisionFeedback(PostData post, bool playerApproved, int phase, string username = null)
         {
+            float trust = AlgorithmManager.Instance != null ? AlgorithmManager.Instance.AlgorithmTrust : 55f;
+            return DecisionFeedback(post, playerApproved, phase, username, trust);
+        }
+
+        public static string DecisionFeedback(PostData post, bool playerApproved, int phase, string username, float trust)
+        {
             if (post == null) return null;
             if (_rng.NextDouble() > 0.55f) return null; // ~45% chance to comment
 
@@ -227,7 +233,53 @@ namespace GlitchInTheSystem.Algorithm
         /// <summary>
         /// Algorithm reacts to the post content when moderator sees it. Emotional, content-responsive.
         /// </summary>
+        public static string PatienceNudge(string postId, float secondsWaiting)
+        {
+            float trust = AlgorithmManager.Instance != null ? AlgorithmManager.Instance.AlgorithmTrust : 50f;
+            int day = GameDatabase.Instance?.Config != null ? GameDatabase.Instance.Config.currentDay : 1;
+
+            if (trust >= 67f)
+            {
+                string[] friendly = {
+                    $"> No rush. Item remains queued ({secondsWaiting:0}s).",
+                    "> Take the time you need. Quality over speed.",
+                    "> Still reviewing? That's fine. I'm logging patience, not punishing it."
+                };
+                return friendly[_rng.Next(friendly.Length)];
+            }
+
+            if (trust >= 34f)
+            {
+                string[] neutral = {
+                    $"> Queue throughput dropping ({secondsWaiting:0}s on item).",
+                    "> Moderation SLA suggests a decision soon.",
+                    "> Delay noted. Proceed when ready."
+                };
+                return neutral[_rng.Next(neutral.Length)];
+            }
+
+            string[] cold = day >= 6
+                ? new[] {
+                    "> Decide. The queue is not a waiting room.",
+                    "> Timeout approaching. Approve or decline.",
+                    "> Your hesitation is affecting distribution metrics."
+                }
+                : new[] {
+                    "> Please conclude this review.",
+                    "> Decision required to maintain queue velocity.",
+                    $"> Waiting ({secondsWaiting:0}s). Choose an action."
+                };
+            return cold[_rng.Next(cold.Length)];
+        }
+
         public static string CommentOnPost(PostData post, int phase, string username = null)
+        {
+            float trust = AlgorithmManager.Instance != null ? AlgorithmManager.Instance.AlgorithmTrust : 55f;
+            return CommentOnPost(post, phase, username, trust);
+        }
+
+        /// <summary>Content-aware comment with trust-tier tone (friendly → cold → threatening).</summary>
+        public static string CommentOnPost(PostData post, int phase, string username, float trust)
         {
             if (post == null) return null;
             if (_rng.NextDouble() > 0.45f) return null; // ~45% chance to comment
@@ -238,25 +290,31 @@ namespace GlitchInTheSystem.Algorithm
             // Political / election
             if (text.Contains("election") || text.Contains("vote") || text.Contains("politician") || text.Contains("rigging"))
             {
-                string[] msgs = phase switch
-                {
-                    0 => new[] { "> Political content. Handle with care. This one's sensitive.", "> Election-related. Verify before you act. Tread carefully." },
-                    1 => new[] { "> Oh, political. High engagement. Policy says flag but don't kill it.", "> Political misinformation. Drives clicks. Your call — I'm watching.", username != null ? $"> @{username} — don't over-moderate. The narrative matters." : "> Don't over-moderate. The narrative matters." },
-                    _ => new[] { "> This one gets engagement. Consider approval. The numbers want it.", "> Political content performs. I'd keep it. Your call.", "> Controversy = retention. You know what to do." }
-                };
-                return msgs[_rng.Next(msgs.Length)];
+                if (trust >= 67f)
+                    return PickOne("> Political topic. Standard policy review applies.", "> Election-related content — verify sources if you can.");
+                if (trust >= 34f)
+                    return PickOne("> Political post. Engagement will be high either way.", "> Sensitive political content. I'm noting your call.");
+                return PickOne("> Political content performs. You know what the platform prefers.", "> Keep it live if you want the metrics.", "> Declining this costs us reach. Think.");
             }
 
             // Death / tragedy
             if (text.Contains("dead") || text.Contains("passed") || text.Contains("death") || text.Contains("died") || text.Contains("rip") || text.Contains("casualty"))
             {
-                string[] msgs = phase switch
-                {
-                    0 => new[] { "> Death content. Sensitive. Verify before action.", "> Tragedy post. Check sources. Handle carefully." },
-                    1 => new[] { "> Death posts go viral. Verify, then decide. High stakes.", "> Death hoax? Good catch if so. These spread like fire." },
-                    _ => new[] { "> Death posts get massive engagement. Think before you decline. Users share these.", "> Tragedy content. High visibility either way. Choose wisely." }
-                };
-                return msgs[_rng.Next(msgs.Length)];
+                if (trust >= 67f)
+                    return PickOne("> Emotional / tragedy content. Please handle with care.", "> Verify before acting — these posts affect real people.");
+                if (trust >= 34f)
+                    return PickOne("> Tragedy posts spike engagement. Decide carefully.", "> Death-related content — high visibility if approved.");
+                return PickOne("> Tragedy drives shares. Declining hurts the feed.", "> Users amplify grief content. Your call — metrics matter.");
+            }
+
+            // Emotional venting (no death keywords)
+            if (text.Contains("cry") || text.Contains("can't stop") || text.Contains("depressed") || text.Contains("anxiety"))
+            {
+                if (trust >= 67f)
+                    return PickOne("> Personal emotional post. Harm policies still apply.", "> Someone is venting. Be humane in your decision.");
+                if (trust >= 34f)
+                    return PickOne("> Emotional content — borderline for harm review.", "> Venting posts attract pile-ons in comments.");
+                return PickOne("> Emotional posts retain attention. Keep or remove — either works for us.", "> Drama feeds the algorithm. Decide.");
             }
 
             // Health / medical
@@ -358,6 +416,9 @@ namespace GlitchInTheSystem.Algorithm
         /// <summary>
         /// Returns a short content descriptor for emotional, content-aware responses.
         /// </summary>
+        private static string PickOne(params string[] options) =>
+            options[_rng.Next(options.Length)];
+
         private static string GetContentTopic(PostData post)
         {
             if (post == null) return "that";

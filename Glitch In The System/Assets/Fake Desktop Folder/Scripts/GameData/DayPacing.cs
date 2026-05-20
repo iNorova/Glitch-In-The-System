@@ -45,12 +45,25 @@ namespace GlitchInTheSystem.GameData
 
             if (algorithm == null) return;
 
-            // Day 1: tutorial — phase 0, zero interference.
+            // Day 1: tutorial — zero interference unless config enables test tuning.
             if (day == 1)
             {
-                algorithm.Phase = 0;
-                algorithm.SetOverrideChances(0f, 0f, 0f);
-                algorithm.SetRewriteChances(0f, 0f, 0f);
+                if (config.day1EnableAlgorithmTest)
+                {
+                    int testPhase = Mathf.Clamp(config.day1TestPhase, 0, 2);
+                    algorithm.Phase = testPhase;
+                    float o = Mathf.Clamp01(config.day1TestOverrideChance);
+                    float r = Mathf.Clamp01(config.day1TestRewriteChance);
+                    algorithm.SetOverrideChances(o, o, o);
+                    algorithm.SetRewriteChances(r, r, r);
+                }
+                else
+                {
+                    algorithm.Phase = 0;
+                    algorithm.SetOverrideChances(0f, 0f, 0f);
+                    algorithm.SetRewriteChances(0f, 0f, 0f);
+                }
+
                 return;
             }
 

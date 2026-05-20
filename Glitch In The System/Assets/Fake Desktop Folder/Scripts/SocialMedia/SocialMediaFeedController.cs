@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using GlitchInTheSystem.Algorithm;
 using GlitchInTheSystem.GameData;
 using GlitchInTheSystem.Social;
 using GlitchInTheSystem.UI;
@@ -45,6 +46,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
     private float _nextRefreshAt;
     private string _lastSignature;
+    private bool _feedScrollInitialized;
+    private SocialMediaFeedPlatformChrome _platformChrome;
 
 #if UNITY_EDITOR
     public bool IsEditModeFreeformLayout =>
@@ -69,15 +72,75 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         AutoBindByName();
         WireButtonsIfPresent();
         EnsureWindowFocusHandler();
+        EnsurePlatformChrome();
 
         if (Application.isPlaying)
         {
+            AlgorithmPostAlteredNotifier.PostAltered += OnFeedPostAltered;
             SetRuntimeFeedHostVisible(forceRuntimeFeedHost);
             SetDesignTemplateVisible(false);
             RefreshFeed(force: true);
             StartCoroutine(RefreshNextFrame());
             _nextRefreshAt = Time.unscaledTime + Mathf.Max(0.2f, autoRefreshSeconds);
         }
+    }
+
+    private void OnDisable()
+    {
+        if (Application.isPlaying)
+            AlgorithmPostAlteredNotifier.PostAltered -= OnFeedPostAltered;
+    }
+
+    private void OnFeedPostAltered(PostData post, bool rewrite)
+    {
+        if (post == null || !isActiveAndEnabled) return;
+
+        if (TryUpdateFeedCardInPlace(post))
+            StartCoroutine(FlashFeedCardGlitchAfterLayout(post, rewrite));
+    }
+
+    private bool TryUpdateFeedCardInPlace(PostData post)
+    {
+        if (feedContent == null || post == null || GameDatabase.Instance == null) return false;
+
+        var card = feedContent.Find($"FeedCard_{post.id}");
+        if (card == null) return false;
+
+        var user = GameDatabase.Instance.GetUser(post.authorUserId);
+        SocialMediaFeedCardBinder.Apply(card, post, user, expandComments: false);
+        RebuildFeedCardLayout(card as RectTransform);
+        return true;
+    }
+
+    private IEnumerator FlashFeedCardGlitchAfterLayout(PostData post, bool emphasizeRewrite)
+    {
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+        if (feedContent == null || post == null) yield break;
+
+        var card = feedContent.Find($"FeedCard_{post.id}");
+        if (card == null) yield break;
+
+        SocialMediaFeedCardBinder.FlashAlterationGlitch(card, post, emphasizeRewrite);
+    }
+
+    private IEnumerator RestoreFeedScrollNextFrame(float normalizedPosition)
+    {
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+        if (feedScrollRect != null)
+            feedScrollRect.verticalNormalizedPosition = Mathf.Clamp01(normalizedPosition);
+    }
+
+    private void EnsurePlatformChrome()
+    {
+        var panel = FindRect("FloatingPanel");
+        if (panel == null) return;
+        _platformChrome ??= GetComponent<SocialMediaFeedPlatformChrome>();
+        if (_platformChrome == null)
+            _platformChrome = gameObject.AddComponent<SocialMediaFeedPlatformChrome>();
+        if (Application.isPlaying)
+            _platformChrome.EnsureChrome(panel);
     }
 
     private IEnumerator RefreshNextFrame()
@@ -379,6 +442,10 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (!force && signature == _lastSignature) return;
         _lastSignature = signature;
 
+        float? savedScroll = null;
+        if (feedScrollRect != null && _feedScrollInitialized)
+            savedScroll = feedScrollRect.verticalNormalizedPosition;
+
         RebuildEntries(posts, id => GameDatabase.Instance.GetUser(id));
 
         if (feedStatsText != null)
@@ -392,7 +459,15 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         RebuildFeedLayout();
 
         if (feedScrollRect != null)
-            feedScrollRect.verticalNormalizedPosition = 1f;
+        {
+            if (!_feedScrollInitialized)
+            {
+                feedScrollRect.verticalNormalizedPosition = 1f;
+                _feedScrollInitialized = true;
+            }
+            else if (savedScroll.HasValue)
+                StartCoroutine(RestoreFeedScrollNextFrame(savedScroll.Value));
+        }
     }
 
     private void RebuildEntries(IReadOnlyList<PostData> posts, Func<string, UserProfileData> getUser)
@@ -975,13 +1050,38 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
     private List<PostData> BuildDisplayFeed(List<PostData> approvedPosts)
     {
-        var feed = new List<PostData>(GenerateFillerPosts());
+        // Player-approved posts first (algorithm may have altered them — personal stakes).
+        var feed = new List<PostData>();
         if (approvedPosts != null && approvedPosts.Count > 0)
-            feed.InsertRange(0, approvedPosts);
+            feed.AddRange(approvedPosts);
+
+        if (GameDatabase.Instance != null && GameDatabase.Instance.Users.Count > 0)
+        {
+            var users = GameDatabase.Instance.Users;
+            var rng = new System.Random(90210);
+            for (int i = 0; i < 3; i++)
+            {
+                var author = users[rng.Next(users.Count)];
+                feed.Add(ModerationContentPools.BuildAmbientFeedPost(author, i, rng));
+            }
+        }
+
+        var filler = GenerateFillerPosts();
+        int fillerCap = Mathf.Min(4, filler.Count);
+        for (int f = 0; f < fillerCap; f++)
+            feed.Add(filler[f]);
+
         return feed;
     }
 
-    private List<PostData> GenerateFillerPosts() => SocialMediaFeedPreviewData.CreatePlayFillerPosts();
+    private List<PostData> GenerateFillerPosts()
+    {
+        var posts = SocialMediaFeedPreviewData.CreatePlayFillerPosts();
+        var rng = new System.Random(4242);
+        foreach (var p in posts)
+            OrganicEngagementUtility.ApplyToPost(p, rng, p.category);
+        return posts;
+    }
 
     private void EnsureWindowFocusHandler()
     {

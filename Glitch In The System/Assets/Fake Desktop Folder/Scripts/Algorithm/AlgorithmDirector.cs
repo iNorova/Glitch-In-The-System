@@ -8,6 +8,7 @@ namespace GlitchInTheSystem.Algorithm
     /// <summary>
     /// "Algorithm AI" director — escalates from helpful to manipulative over time (Kinito Pet vibe).
     /// Intercepts decisions, rewrites posts, shadowbans, nudges engagement. Logs everything for evidence.
+    /// Interference chances prefer <see cref="AlgorithmManager"/> ScriptableObject profiles when present (event-driven; no Update).
     /// </summary>
     public sealed class AlgorithmDirector : MonoBehaviour
     {
@@ -111,12 +112,7 @@ namespace GlitchInTheSystem.Algorithm
                 return (forcedApproved, true, forcedReason);
             }
 
-            float overrideChance = phase switch
-            {
-                0 => overrideChancePhase0,
-                1 => overrideChancePhase1,
-                _ => overrideChancePhase2
-            };
+            float overrideChance = GetOverrideChanceForCurrentPhase();
 
             // Content-aware override chance: intervene more when player's call conflicts with content
             if (post != null && phase >= 1)
@@ -134,6 +130,9 @@ namespace GlitchInTheSystem.Algorithm
                 else if (!playerApproved && isProblematic && phase == 2)
                     overrideChance = Mathf.Min(1f, overrideChance * 1.2f);   // Sometimes override: you declined engagement
             }
+
+            overrideChance *= AlgorithmDayHostility.GetInterferenceMultiplier(AlgorithmDayHostility.GetCurrentDay());
+            overrideChance = Mathf.Clamp01(overrideChance);
 
             if (overrideChance <= 0f || _rng.NextDouble() > overrideChance)
                 return (playerApproved, false, null);
@@ -186,15 +185,14 @@ namespace GlitchInTheSystem.Algorithm
         /// </summary>
         public bool TryRewritePost(PostData post)
         {
-            float rewriteChance = phase switch
-            {
-                0 => rewriteChancePhase0,
-                1 => rewriteChancePhase1,
-                _ => rewriteChancePhase2
-            };
+            float rewriteChance = GetRewriteChanceForCurrentPhase();
+
+            rewriteChance *= AlgorithmDayHostility.GetInterferenceMultiplier(AlgorithmDayHostility.GetCurrentDay());
+            rewriteChance = Mathf.Clamp01(rewriteChance);
 
             if (rewriteChance <= 0f || _rng.NextDouble() > rewriteChance) return false;
 
+            string beforeText = post.text;
             string newText = phase switch
             {
                 1 => SoftenOrHarden(post.text),
@@ -217,6 +215,10 @@ namespace GlitchInTheSystem.Algorithm
 
             var msg = AlgorithmVoice.ContentRewritten(post, phase);
             if (!string.IsNullOrEmpty(msg)) AlgorithmNotification.Instance?.Show(msg);
+
+            if (beforeText != post.text)
+                AlgorithmPostAlteredNotifier.Notify(post, rewrite: true);
+
             return true;
         }
 
@@ -225,7 +227,8 @@ namespace GlitchInTheSystem.Algorithm
         /// </summary>
         public void TryShadowBanOnDecline(string authorUserId)
         {
-            if (phase < 2 || _rng.NextDouble() > shadowBanChancePhase2) return;
+            float shadowChance = GetShadowBanChanceForCurrentPhase();
+            if (phase < 2 || shadowChance <= 0f || _rng.NextDouble() > shadowChance) return;
 
             if (GameDatabase.Instance != null)
             {
@@ -246,7 +249,16 @@ namespace GlitchInTheSystem.Algorithm
         {
             if (phase < 1) return;
 
-            int delta = _rng.Next(engagementNudgeMin, engagementNudgeMax);
+            int nudgeMin = engagementNudgeMin;
+            int nudgeMax = engagementNudgeMax;
+            if (UseManagerProfiles())
+            {
+                var range = AlgorithmManager.Instance.GetEngagementNudgeRange();
+                nudgeMin = range.min;
+                nudgeMax = Mathf.Max(nudgeMin + 1, range.max);
+            }
+
+            int delta = _rng.Next(nudgeMin, nudgeMax);
             int likes = _rng.Next(0, delta);
             int shares = _rng.Next(0, delta - likes);
             int comments = delta - likes - shares;
@@ -293,6 +305,47 @@ namespace GlitchInTheSystem.Algorithm
         {
             if (string.IsNullOrEmpty(s)) return "";
             return s.Length <= max ? s : s.Substring(0, max);
+        }
+
+        /// <summary>Uses <see cref="AlgorithmManager"/> trust-state profile when available; scripted days 1–3 keep DayPacing inspector values.</summary>
+        private bool UseManagerProfiles()
+        {
+            int day = GameDatabase.Instance?.Config != null ? GameDatabase.Instance.Config.currentDay : 1;
+            return AlgorithmManager.Instance != null && !DayPacing.IsScriptedDay(day);
+        }
+
+        private float GetOverrideChanceForCurrentPhase()
+        {
+            if (UseManagerProfiles())
+                return AlgorithmManager.Instance.GetOverrideChance();
+
+            return phase switch
+            {
+                0 => overrideChancePhase0,
+                1 => overrideChancePhase1,
+                _ => overrideChancePhase2
+            };
+        }
+
+        private float GetRewriteChanceForCurrentPhase()
+        {
+            if (UseManagerProfiles())
+                return AlgorithmManager.Instance.GetRewriteChance();
+
+            return phase switch
+            {
+                0 => rewriteChancePhase0,
+                1 => rewriteChancePhase1,
+                _ => rewriteChancePhase2
+            };
+        }
+
+        private float GetShadowBanChanceForCurrentPhase()
+        {
+            if (UseManagerProfiles())
+                return AlgorithmManager.Instance.GetShadowBanChance();
+
+            return phase >= 2 ? shadowBanChancePhase2 : 0f;
         }
     }
 }
