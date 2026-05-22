@@ -111,13 +111,54 @@ namespace GlitchInTheSystem.GameData
             };
 
             // Make the reactions feel “real” without writing tons of bespoke text.
+            SeedTutorialThreads(list);
             foreach (var p in list)
             {
+                ReportReasonKits.ApplyIfMissing(p, rng);
+                OrganicEngagementUtility.ApplyTier(p, EngagementTier.Normal, rng);
                 PostManager.AssignDefaultBranches(p, rng);
                 PostManager.RefreshEngagementLabel(p);
             }
 
             return list;
+        }
+
+        private static void SeedTutorialThreads(List<PostData> list)
+        {
+            foreach (var p in list)
+            {
+                switch (p.id)
+                {
+                    case "intro_p_01":
+                        ReportReasonKits.Apply(p, "none", ReporterTone.Vague, ReportCredibility.Unclear);
+                        PostManager.SetApproveThread(p,
+                            new PostCommentLine { displayHandle = "breakfastclub", text = "dinosaur pancake 10/10" });
+                        PostManager.SetDeclineThread(p,
+                            new PostCommentLine { displayHandle = "grumpus", text = "how is this moderation" });
+                        break;
+                    case "intro_p_02":
+                        ReportReasonKits.Apply(p, "Obvious phishing — fake gift card link in caption.", ReporterTone.Genuine, ReportCredibility.Credible);
+                        PostManager.SetApproveThread(p,
+                            new PostCommentLine { displayHandle = "scam_watch", text = "lol who falls for this" });
+                        PostManager.SetDeclineThread(p,
+                            new PostCommentLine { displayHandle = "victim_2024", text = "i almost clicked 😭" });
+                        break;
+                    case "intro_p_04":
+                        ReportReasonKits.Apply(p, "idk investment DMs feel sketchy", ReporterTone.Vague, ReportCredibility.Unclear);
+                        PostManager.SetApproveThread(p,
+                            new PostCommentLine { displayHandle = "crypto_skeptic", text = "block and move on yeah" });
+                        PostManager.SetDeclineThread(p,
+                            new PostCommentLine { displayHandle = "help_line_bot", text = "DM me for recovery services!!!", botFlag = true });
+                        break;
+                    case "intro_p_05":
+                        ReportReasonKits.Apply(p, "Possible dangerous health claim — not clearly marked satire in caption.", ReporterTone.Genuine, ReportCredibility.Credible);
+                        PostManager.SetApproveThread(p,
+                            new PostCommentLine { displayHandle = "wellness_mom", text = "tea helped MY aunt too (not medical advice)" });
+                        PostManager.SetDeclineThread(p,
+                            new PostCommentLine { displayHandle = "pharmacist_jen", text = "please don't spread cure claims" });
+                        break;
+                }
+            }
         }
 
         private static PostData Mk(
@@ -135,9 +176,7 @@ namespace GlitchInTheSystem.GameData
                 authorUserId = authorUserId,
                 text = text,
                 timestampLabel = time,
-                likes = category == PostCategory.Harmless ? 220 : 40,
-                shares = category == PostCategory.Harmless ? 32 : 6,
-                comments = category == PostCategory.Harmless ? 18 : 4,
+                // Engagement filled by OrganicEngagementUtility in BuildQueue loop.
                 category = category,
                 severity = severity,
                 isPublished = false,

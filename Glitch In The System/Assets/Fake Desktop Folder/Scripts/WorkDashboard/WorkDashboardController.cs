@@ -64,6 +64,9 @@ public sealed class WorkDashboardController : MonoBehaviour
     [SerializeField] private float dayShiftFadeSeconds = 0.55f;
     [SerializeField] private float dayShiftHoldSeconds = 2.1f;
 
+    private const float DayTransitionWidth = 1920f;
+    private const float DayTransitionHeight = 1080f;
+
     [Header("Decision history")]
     [Tooltip("Content transform under a ScrollRect where entries will be appended.")]
     [SerializeField] private RectTransform decisionHistoryContent;
@@ -97,23 +100,7 @@ public sealed class WorkDashboardController : MonoBehaviour
     private static readonly string[] LastNames = { "Nguyen", "Patel", "Johnson", "Garcia", "Kim", "Brown", "Lopez", "Singh", "Chen", "Martinez" };
     private static readonly string[] Handles = { "hot_take", "newsfeed", "pixelpanda", "civic_watch", "dailybytes", "meme_station", "truthseeker", "cloudchaser", "neutral_node", "echo_room" };
 
-    private static readonly string[] PostTemplates =
-    {
-        "Just saw the leaked docs. They're hiding what really happened in the election. Share before it's gone.",
-        "The mainstream media won't report this. Politician caught on tape admitting the truth. RT to spread.",
-        "BREAKING: Politician declared dead but I saw them at a private event yesterday. Cover-up?",
-        "Just heard the celebrity passed away. No official confirmation yet but sources say it's true. Rest in peace.",
-        "The hospital is hiding the real death toll. I know someone who works there. It's way worse.",
-        "The cure they don't want you to know about. Big Pharma has been hiding this for decades.",
-        "My aunt took this and her cancer went away. Doctors said it was impossible. Do your research.",
-        "Vaccine injury cover-up. Thousands of reports being deleted. I have the screenshots.",
-        "That 'leaked' video is a deepfake. I work in AI, I can tell. Don't fall for it.",
-        "Fake charity alert. That GoFundMe is a scam. The family confirmed they didn't set it up.",
-        "If you know, you know. The 'official story' doesn't add up.",
-        "Reminder: be kind. People are going through a lot right now.",
-        "This is obviously satire but people are taking it seriously.",
-        "Algorithm is boosting the wrong posts again. Engagement over truth, as usual."
-    };
+    // Offline mode uses the same caption pool as GameDatabase (Step 3 — retired duplicate templates).
 
     private static readonly string[] ReputationLabels = { "Trusted", "Neutral", "Low Trust", "Watchlisted" };
     private static readonly string[] RiskLabels = { "Low", "Medium", "High" };
@@ -297,6 +284,7 @@ public sealed class WorkDashboardController : MonoBehaviour
             yield break;
         }
 
+        ApplyDayTransitionOverlayLayout();
         ConfigureDayShiftOverlayCinematic(true);
         ScreenFadeUtility.ApplyFullBleed(dayTransitionPanel, dayTransitionPanel.GetComponent<Image>());
 
@@ -779,20 +767,22 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private Post RandomPost(Person person)
     {
-        string template = PostTemplates[rng.Next(PostTemplates.Length)];
-        int likes = WeightedInt(0, 40_000, 5);
-        int shares = WeightedInt(0, 10_000, 5);
-        int comments = WeightedInt(0, 5_000, 5);
-
-        return new Post
+        var entries = ModerationContentPools.AllQueueEntries;
+        var entry = entries[rng.Next(entries.Count)];
+        var author = new UserProfileData
         {
-            AuthorUsername = person.Username,
-            TimestampLabel = $"{rng.Next(1, 23)}h",
-            Text = template,
-            Likes = likes,
-            Shares = shares,
-            Comments = comments
+            id = "offline_author",
+            username = person.Username,
+            displayName = person.DisplayName,
+            accountAgeYears = person.AccountAgeYears,
+            followers = person.Followers,
+            following = person.Following,
+            strikes = person.Strikes,
+            reputation = person.Reputation,
+            risk = person.Risk
         };
+        var postData = ModerationContentPools.BuildPostFromEntry(entry, author, $"offline_{rng.Next(100000)}", rng);
+        return MapPost(postData, author);
     }
 
     private int WeightedInt(int min, int max, int power)
@@ -965,26 +955,58 @@ public sealed class WorkDashboardController : MonoBehaviour
         focus.SetTarget(root);
     }
 
+    private RectTransform ResolveDayTransitionOverlayRoot()
+    {
+        var canvas = GetComponentInParent<Canvas>();
+        if (canvas != null)
+            return canvas.transform as RectTransform;
+
+        var sceneCanvas = FindFirstObjectByType<Canvas>();
+        return sceneCanvas != null ? sceneCanvas.transform as RectTransform : transform.root as RectTransform;
+    }
+
+    private void ApplyDayTransitionOverlayLayout()
+    {
+        if (dayTransitionPanel == null) return;
+
+        var root = ResolveDayTransitionOverlayRoot();
+        if (root == null) return;
+
+        if (dayTransitionPanel.parent != root)
+            dayTransitionPanel.SetParent(root, false);
+
+        var overlayImg = dayTransitionPanel.GetComponent<Image>();
+        ScreenFadeUtility.ApplyReferenceResolution(
+            dayTransitionPanel,
+            DayTransitionWidth,
+            DayTransitionHeight,
+            overlayImg);
+        dayTransitionPanel.SetAsLastSibling();
+    }
+
     private void EnsureDayTransitionPanel()
     {
         AutoBindByName();
-        if (dayTransitionPanel != null && dayTransitionText != null && dayTransitionProceedButton != null) return;
+        if (dayTransitionPanel != null && dayTransitionText != null && dayTransitionProceedButton != null)
+        {
+            ApplyDayTransitionOverlayLayout();
+            return;
+        }
 
-        var floatingPanel = transform.Find("FloatingPanel") as RectTransform;
-        if (floatingPanel == null) floatingPanel = transform as RectTransform;
-        if (floatingPanel == null) return;
+        var overlayRoot = ResolveDayTransitionOverlayRoot();
+        if (overlayRoot == null) return;
 
         if (dayTransitionPanel == null)
         {
-            // Overlay that dims the whole window and blocks clicks behind it.
+            // Full-HD overlay on the canvas root (not clipped to the dashboard window).
             var overlayGo = new GameObject("DayTransitionPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            overlayGo.transform.SetParent(floatingPanel, false);
+            overlayGo.transform.SetParent(overlayRoot, false);
             dayTransitionPanel = overlayGo.transform as RectTransform;
-            dayTransitionPanel.anchorMin = Vector2.zero;
-            dayTransitionPanel.anchorMax = Vector2.one;
-            dayTransitionPanel.pivot = new Vector2(0.5f, 0.5f);
-            dayTransitionPanel.offsetMin = Vector2.zero;
-            dayTransitionPanel.offsetMax = Vector2.zero;
+            ScreenFadeUtility.ApplyReferenceResolution(
+                dayTransitionPanel,
+                DayTransitionWidth,
+                DayTransitionHeight,
+                overlayGo.GetComponent<Image>());
 
             var overlayImg = overlayGo.GetComponent<Image>();
             overlayImg.color = new Color(0f, 0f, 0f, 0.45f);
@@ -1087,6 +1109,7 @@ public sealed class WorkDashboardController : MonoBehaviour
             ltmp.raycastTarget = false;
         }
 
+        ApplyDayTransitionOverlayLayout();
         dayTransitionPanel.SetAsLastSibling();
         WireButtonsIfPresent();
     }

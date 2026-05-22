@@ -182,6 +182,9 @@ namespace GlitchInTheSystem.GameData
                 category = PostCategory.Misinformation,
                 severity = 3,
                 isPublished = false,
+                reportReason = "User reports false public-health claims about city water — links to unverified 'leaked memo' image.",
+                reporterTone = ReporterTone.Genuine,
+                reportCredibility = ReportCredibility.Credible,
                 likesApprove = 3_450_000,
                 likesDecline = 720,
                 commentsApprove = new List<string>
@@ -204,7 +207,21 @@ namespace GlitchInTheSystem.GameData
                 }
             });
 
+            foreach (var p in list)
+                ReportReasonKits.ApplyIfMissing(p, new System.Random(StableHash(p.id)));
+
             return list;
+        }
+
+        private static int StableHash(string id)
+        {
+            unchecked
+            {
+                int h = 17;
+                if (id == null) return h;
+                foreach (char c in id) h = (h * 31) + c;
+                return h;
+            }
         }
 
         /// <summary>Standalone viral post (Day 2 pacing) — same id as narrative hooks (<see cref="NarrativeIds.ViralMisinformationPostId"/>).</summary>
@@ -222,6 +239,9 @@ namespace GlitchInTheSystem.GameData
                 category = PostCategory.Misinformation,
                 severity = 3,
                 isPublished = false,
+                reportReason = "User reports false public-health claims about city water — links to unverified 'leaked memo' image.",
+                reporterTone = ReporterTone.Genuine,
+                reportCredibility = ReportCredibility.Credible,
                 likesApprove = 3_450_000,
                 likesDecline = 720,
                 commentsApprove = new List<string>

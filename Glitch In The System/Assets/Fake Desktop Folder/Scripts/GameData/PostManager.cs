@@ -71,13 +71,25 @@ namespace GlitchInTheSystem.GameData
             if (hasBranchLikes)
                 post.likes = Mathf.Max(0, playerChoseApprove ? post.likesApprove : post.likesDecline);
 
-            IReadOnlyList<string> lines = playerChoseApprove ? post.commentsApprove : post.commentsDecline;
-            post.commentPreview = BuildCommentPreview(post, lines, playerChoseApprove, users);
+            var thread = playerChoseApprove ? post.approveThread : post.declineThread;
+            if (thread != null && thread.Count > 0)
+            {
+                post.commentPreview = BuildCommentPreviewFromThread(post, thread, playerChoseApprove, users);
+            }
+            else
+            {
+                IReadOnlyList<string> lines = playerChoseApprove ? post.commentsApprove : post.commentsDecline;
+                if (lines == null || lines.Count == 0)
+                    lines = GenerateContextualLines(post, playerChoseApprove);
+                post.commentPreview = BuildCommentPreview(post, lines, playerChoseApprove, users);
+            }
 
             if (hasBranchLikes || post.commentPreview.Count > 0)
             {
                 post.shares = Mathf.Max(0, DeriveShares(post.likes, playerChoseApprove));
-                post.comments = Mathf.Max(post.commentPreview.Count, DeriveThreadCommentCount(post.likes, playerChoseApprove));
+                // Displayed comment count matches visible preview lines (Step 4 rule).
+                post.comments = post.commentPreview.Count;
+                post.shares = Mathf.Min(post.shares, OrganicEngagementUtility.MaxSharesForLikes(post.likes));
             }
 
             RefreshEngagementLabel(post);
@@ -129,6 +141,57 @@ namespace GlitchInTheSystem.GameData
             }
 
             return result;
+        }
+
+        /// <summary>Builds preview from authored <see cref="PostCommentLine"/> threads (handles, replies, bots).</summary>
+        private static List<CommentData> BuildCommentPreviewFromThread(
+            PostData post,
+            IReadOnlyList<PostCommentLine> thread,
+            bool playerChoseApprove,
+            IReadOnlyList<UserProfileData> users)
+        {
+            var result = new List<CommentData>();
+            if (post == null || thread == null) return result;
+
+            int show = Mathf.Min(6, thread.Count);
+            for (int i = 0; i < show; i++)
+            {
+                var line = thread[i];
+                if (line == null || string.IsNullOrWhiteSpace(line.text)) continue;
+
+                int day = GameDatabase.Instance?.Config != null ? GameDatabase.Instance.Config.currentDay : 0;
+                int seed = StableHash($"{post.id}|{day}|{(playerChoseApprove ? "A" : "D")}|{line.displayHandle}|{i}");
+                var seeded = new System.Random(seed);
+
+                result.Add(new CommentData
+                {
+                    id = $"c_{post.id}_{i}_{(playerChoseApprove ? "ok" : "no")}",
+                    postId = post.id,
+                    authorUserId = PickCommentAuthorId(users, i),
+                    displayHandle = string.IsNullOrWhiteSpace(line.displayHandle) ? $"user{seeded.Next(100, 9999)}" : line.displayHandle,
+                    text = FormatThreadLine(line, thread),
+                    timestampLabel = $"{seeded.Next(1, 45)}m",
+                    likes = Mathf.Max(0, DeriveCommentLikeCount(post.likes, i, playerChoseApprove)),
+                    replyToIndex = line.replyToIndex,
+                    botFlag = line.botFlag,
+                    isHidden = false
+                });
+            }
+
+            return result;
+        }
+
+        private static string FormatThreadLine(PostCommentLine line, IReadOnlyList<PostCommentLine> thread)
+        {
+            if (line == null) return "";
+            if (line.replyToIndex < 0 || line.replyToIndex >= thread.Count)
+                return line.text;
+
+            var parent = thread[line.replyToIndex];
+            string parentHandle = parent != null && !string.IsNullOrWhiteSpace(parent.displayHandle)
+                ? parent.displayHandle
+                : "user";
+            return $"@{parentHandle} {line.text}";
         }
 
         private static string PickCommentAuthorId(IReadOnlyList<UserProfileData> users, int index)
@@ -619,9 +682,24 @@ namespace GlitchInTheSystem.GameData
                 ? Mathf.RoundToInt(baseLikes * (0.05f + (float)rng.NextDouble() * 0.15f))
                 : Mathf.RoundToInt(baseLikes * (0.25f + (float)rng.NextDouble() * 0.35f));
 
-            // Context grounded comments (no generic filler).
-            post.commentsApprove = new List<string>(GenerateContextualLines(post, approved: true));
-            post.commentsDecline = new List<string>(GenerateContextualLines(post, approved: false));
+            // Only fill legacy lists when no authored thread exists (fallback path).
+            if (post.approveThread == null || post.approveThread.Count == 0)
+                post.commentsApprove = new List<string>(GenerateContextualLines(post, approved: true));
+            if (post.declineThread == null || post.declineThread.Count == 0)
+                post.commentsDecline = new List<string>(GenerateContextualLines(post, approved: false));
+        }
+
+        /// <summary>Helper for hand-authored bundles (Step 4+).</summary>
+        public static void SetApproveThread(PostData post, params PostCommentLine[] lines)
+        {
+            if (post == null) return;
+            post.approveThread = lines != null ? new List<PostCommentLine>(lines) : new List<PostCommentLine>();
+        }
+
+        public static void SetDeclineThread(PostData post, params PostCommentLine[] lines)
+        {
+            if (post == null) return;
+            post.declineThread = lines != null ? new List<PostCommentLine>(lines) : new List<PostCommentLine>();
         }
     }
 }

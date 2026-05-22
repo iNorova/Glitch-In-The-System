@@ -47,6 +47,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     private float _nextRefreshAt;
     private string _lastSignature;
     private bool _feedScrollInitialized;
+    private ScrollRect _feedScrollRectUsedForInit;
+    private Coroutine _restoreScrollRoutine;
     private SocialMediaFeedPlatformChrome _platformChrome;
 
 #if UNITY_EDITOR
@@ -87,6 +89,12 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
     private void OnDisable()
     {
+        if (_restoreScrollRoutine != null)
+        {
+            StopCoroutine(_restoreScrollRoutine);
+            _restoreScrollRoutine = null;
+        }
+
         if (Application.isPlaying)
             AlgorithmPostAlteredNotifier.PostAltered -= OnFeedPostAltered;
     }
@@ -124,12 +132,31 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         SocialMediaFeedCardBinder.FlashAlterationGlitch(card, post, emphasizeRewrite);
     }
 
-    private IEnumerator RestoreFeedScrollNextFrame(float normalizedPosition)
+    private void ScheduleRestoreFeedScroll(float normalizedPosition)
     {
+        if (_restoreScrollRoutine != null)
+            StopCoroutine(_restoreScrollRoutine);
+        _restoreScrollRoutine = StartCoroutine(RestoreFeedScrollAfterRebuild(normalizedPosition));
+    }
+
+    private IEnumerator RestoreFeedScrollAfterRebuild(float normalizedPosition)
+    {
+        float clamped = Mathf.Clamp01(normalizedPosition);
+        yield return null;
+        RebuildFeedLayout();
         yield return null;
         Canvas.ForceUpdateCanvases();
+        if (feedContent != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(feedContent);
+        yield return new WaitForEndOfFrame();
+
         if (feedScrollRect != null)
-            feedScrollRect.verticalNormalizedPosition = Mathf.Clamp01(normalizedPosition);
+        {
+            feedScrollRect.StopMovement();
+            feedScrollRect.verticalNormalizedPosition = clamped;
+        }
+
+        _restoreScrollRoutine = null;
     }
 
     private void EnsurePlatformChrome()
@@ -442,9 +469,10 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (!force && signature == _lastSignature) return;
         _lastSignature = signature;
 
-        float? savedScroll = null;
-        if (feedScrollRect != null && _feedScrollInitialized)
-            savedScroll = feedScrollRect.verticalNormalizedPosition;
+        bool preserveScroll = feedScrollRect != null
+            && _feedScrollInitialized
+            && _feedScrollRectUsedForInit == feedScrollRect;
+        float savedScroll = preserveScroll ? feedScrollRect.verticalNormalizedPosition : 1f;
 
         RebuildEntries(posts, id => GameDatabase.Instance.GetUser(id));
 
@@ -456,18 +484,20 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             feedStatsText.text = $"Day {day}{quirk}  |  Live: {approvedPosts.Count}  |  Feed: {posts.Count}  |  Rendered: {rendered}";
         }
 
-        RebuildFeedLayout();
-
         if (feedScrollRect != null)
         {
-            if (!_feedScrollInitialized)
+            if (!preserveScroll)
             {
+                RebuildFeedLayout();
                 feedScrollRect.verticalNormalizedPosition = 1f;
                 _feedScrollInitialized = true;
+                _feedScrollRectUsedForInit = feedScrollRect;
             }
-            else if (savedScroll.HasValue)
-                StartCoroutine(RestoreFeedScrollNextFrame(savedScroll.Value));
+            else
+                ScheduleRestoreFeedScroll(savedScroll);
         }
+        else
+            RebuildFeedLayout();
     }
 
     private void RebuildEntries(IReadOnlyList<PostData> posts, Func<string, UserProfileData> getUser)

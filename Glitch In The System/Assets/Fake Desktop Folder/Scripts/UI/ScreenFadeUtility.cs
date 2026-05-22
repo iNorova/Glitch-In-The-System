@@ -34,6 +34,25 @@ namespace GlitchInTheSystem.UI
             }
         }
 
+        /// <summary>Centers a fixed-size overlay (e.g. 1920×1080) on the canvas root.</summary>
+        public static void ApplyReferenceResolution(RectTransform rt, float width, float height, Image background = null)
+        {
+            if (rt == null) return;
+
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(width, height);
+            rt.anchoredPosition = Vector2.zero;
+            rt.localScale = Vector3.one;
+            rt.SetAsLastSibling();
+
+            if (background != null)
+            {
+                background.raycastTarget = true;
+            }
+        }
+
         public static IEnumerator Fade(CanvasGroup group, float endAlpha, float duration)
         {
             if (group == null)

@@ -697,12 +697,21 @@ namespace GlitchInTheSystem.Intro
             _introRootCanvasGroup.blocksRaycasts = blockRaycasts;
         }
 
+        private const float DayCardOverlayWidth = 1920f;
+        private const float DayCardOverlayHeight = 1080f;
+
         private void PrepareDayCardPanelForFade()
         {
             if (dayCardPanel == null) return;
 
             var rt = dayCardPanel.transform as RectTransform;
             var img = dayCardPanel.GetComponent<Image>();
+            Canvas canvas = ResolveIntroCanvas();
+            var root = canvas != null ? canvas.transform as RectTransform : null;
+            if (root != null && rt != null && rt.parent != root)
+                rt.SetParent(root, false);
+
+            ScreenFadeUtility.ApplyReferenceResolution(rt, DayCardOverlayWidth, DayCardOverlayHeight, img);
             ScreenFadeUtility.ApplyFullBleed(rt, img);
         }
 

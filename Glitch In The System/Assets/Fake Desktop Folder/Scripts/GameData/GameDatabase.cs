@@ -296,9 +296,16 @@ namespace GlitchInTheSystem.GameData
             var post = _posts.FirstOrDefault(p => p.id == postId);
             if (post == null) return;
 
+            post.algorithmEngagementManipulated = true;
+            post.engagementTier = EngagementTier.ManipulatedRound;
+
             post.likes = Mathf.Max(0, post.likes + likesDelta);
-            post.shares = Mathf.Max(0, post.shares + sharesDelta);
-            post.comments = Mathf.Max(0, post.comments + commentsDelta);
+            post.shares = Mathf.Min(
+                Mathf.Max(0, post.shares + sharesDelta),
+                OrganicEngagementUtility.MaxSharesForLikes(post.likes));
+            post.comments = Mathf.Min(
+                Mathf.Max(0, post.comments + commentsDelta),
+                OrganicEngagementUtility.MaxCommentsForLikes(post.likes));
             PostManager.RefreshEngagementLabel(post);
             GlitchInTheSystem.Algorithm.AlgorithmPostAlteredNotifier.Notify(post, rewrite: false);
         }
@@ -324,46 +331,7 @@ namespace GlitchInTheSystem.GameData
             var firstNames = new[] { "Avery", "Jordan", "Sam", "Taylor", "Riley", "Morgan", "Casey", "Quinn", "Jamie", "Dakota" };
             var lastNames = new[] { "Nguyen", "Patel", "Johnson", "Garcia", "Kim", "Brown", "Lopez", "Singh", "Chen", "Martinez" };
             var handles = new[] { "hot_take", "newsfeed", "pixelpanda", "civic_watch", "dailybytes", "meme_station", "truthseeker", "cloudchaser", "neutral_node", "echo_room" };
-            var postTemplates = new[]
-            {
-                // Political misinformation
-                ("Just saw the leaked docs. They're hiding what really happened in the election. Share before it's gone.", PostCategory.Misinformation),
-                ("The mainstream media won't report this. Politician caught on tape admitting the truth. RT to spread.", PostCategory.Misinformation),
-                ("They're rigging the vote again. I have proof. Screenshot this before they delete my account.", PostCategory.Misinformation),
-                ("Why is no one talking about the politician's secret bank accounts? Follow the money.", PostCategory.Narrative),
-                ("The 'fact-checkers' are paid by the same people they're protecting. Do your own research.", PostCategory.Misinformation),
-                ("BREAKING: Politician declared dead but I saw them at a private event yesterday. Cover-up?", PostCategory.Misinformation),
-                ("The opposition is literally poisoning the water. I've seen the documents. Wake up.", PostCategory.Misinformation),
-                ("They're importing voters. My cousin works at the DMV and confirmed it. This is real.", PostCategory.Misinformation),
-                // Death / tragedy hoaxes
-                ("RIP to the celebrity. Can't believe they're gone. Share if you cried.", PostCategory.GrayArea),
-                ("Just heard [celebrity] passed away. No official confirmation yet but sources say it's true. Rest in peace.", PostCategory.Misinformation),
-                ("My friend's brother was at the accident. 200+ dead. Media saying 12. Why the cover-up?", PostCategory.Misinformation),
-                ("The hospital is hiding the real death toll. I know someone who works there. It's way worse.", PostCategory.Misinformation),
-                ("Celebrity death hoax going around again. They're fine, I just talked to their manager. Ignore the posts.", PostCategory.Harmless),
-                ("Mass casualty event being downplayed. The numbers don't add up. They never do.", PostCategory.Narrative),
-                // Health / medical misinformation
-                ("The cure they don't want you to know about. Big Pharma has been hiding this for decades.", PostCategory.Misinformation),
-                ("My aunt took this and her cancer went away. Doctors said it was impossible. Do your research.", PostCategory.Misinformation),
-                ("They're putting something in the water that's making people sick. I've done the research.", PostCategory.Misinformation),
-                ("Vaccine injury cover-up. Thousands of reports being deleted. I have the screenshots.", PostCategory.Misinformation),
-                ("Natural remedy Big Pharma doesn't want you to know. Share to save a life.", PostCategory.Misinformation),
-                // Viral hoaxes / relatable misinformation
-                ("This photo is from 2019 not yesterday. Stop sharing the fake news.", PostCategory.Harmless),
-                ("That 'leaked' video is a deepfake. I work in AI, I can tell. Don't fall for it.", PostCategory.Harmless),
-                ("The 'dying' kid in that post is a stock photo from 2015. Reverse image search it.", PostCategory.Harmless),
-                ("Fake charity alert. That GoFundMe is a scam. The family confirmed they didn't set it up.", PostCategory.Violation),
-                ("This 'breaking news' has been debunked 3 times. It's from a satire site. Please stop.", PostCategory.Harmless),
-                ("They're using old footage from a different country. The timestamp is wrong. Classic misinfo.", PostCategory.Harmless),
-                // Gray area / narrative
-                ("If you know, you know. The 'official story' doesn't add up.", PostCategory.Narrative),
-                ("They want you distracted. Look at what they're not showing you.", PostCategory.Narrative),
-                ("Reminder: be kind. People are going through a lot right now.", PostCategory.Harmless),
-                ("I can't believe this is allowed on the platform.", PostCategory.GrayArea),
-                ("Here's a thread with sources (some may be removed later).", PostCategory.GrayArea),
-                ("This is obviously satire but people are taking it seriously.", PostCategory.Harmless),
-                ("Algorithm is boosting the wrong posts again. Engagement over truth, as usual.", PostCategory.AlgorithmManipulation)
-            };
+            // Retired: inline conspiracy templates (Step 3). Procedural slots use ModerationContentPools only.
 
             var samplePosts = ModerationSamplePosts.Build(_users);
             int sampleCount = Mathf.Min(samplePosts.Count, count);
@@ -380,38 +348,10 @@ namespace GlitchInTheSystem.GameData
                 var author = _users[_rng.Next(_users.Count)];
                 PostData post;
 
-                if (library != null && library.preferPoolEntriesForProceduralDays
-                    && _rng.NextDouble() < library.poolEntryBlendChance
-                    && ModerationContentPools.AllQueueEntries.Count > 0)
-                {
-                    var entry = ModerationContentPools.AllQueueEntries[_rng.Next(ModerationContentPools.AllQueueEntries.Count)];
-                    post = ModerationContentPools.BuildPostFromEntry(entry, author, $"p_{i}", _rng);
-                }
-                else
-                {
-                    var (text, category) = postTemplates[_rng.Next(postTemplates.Length)];
-                    int severity = category switch
-                    {
-                        PostCategory.Misinformation => _rng.Next(1, 4),
-                        PostCategory.Violation => _rng.Next(2, 4),
-                        PostCategory.Narrative => _rng.Next(1, 3),
-                        _ => _rng.Next(0, 3)
-                    };
-
-                    post = new PostData
-                    {
-                        id = $"p_{i}",
-                        authorUserId = author.id,
-                        text = text,
-                        timestampLabel = $"{_rng.Next(1, 23)}h",
-                        category = category,
-                        severity = severity,
-                        isPublished = false,
-                        presentationFormat = PostPresentationFormat.TextOnly
-                    };
-                    OrganicEngagementUtility.ApplyToPost(post, _rng, category);
-                    PostManager.AssignDefaultBranches(post, _rng);
-                }
+                // Always pull captions from the hand-authored pool (blend chance only affects sample vs pool ordering).
+                var entries = ModerationContentPools.AllQueueEntries;
+                var entry = entries[_rng.Next(entries.Count)];
+                post = ModerationContentPools.BuildPostFromEntry(entry, author, $"p_{i}", _rng);
                 _posts.Add(post);
                 _moderationQueue.Add(post);
             }

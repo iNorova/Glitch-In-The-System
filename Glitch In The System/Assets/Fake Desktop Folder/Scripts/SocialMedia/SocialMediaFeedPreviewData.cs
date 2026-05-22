@@ -31,14 +31,14 @@ namespace GlitchInTheSystem.Social
                     authorUserId = $"user{i + 1}",
                     text = texts[i],
                     timestampLabel = $"{(i + 1) * 7}m",
-                    likes = 150 + (i * 83),
-                    shares = 40 + (i * 21),
-                    comments = 18 + (i * 9),
                     category = PostCategory.Harmless,
                     severity = 0,
                     isPublished = true
                 };
-                PostManager.AssignDefaultBranches(post, new System.Random(10_000 + i));
+                var demoRng = new System.Random(10_000 + i);
+                OrganicEngagementUtility.ApplyToPost(post, demoRng, PostCategory.Harmless);
+                ReportReasonKits.ApplyIfMissing(post, demoRng);
+                PostManager.AssignDefaultBranches(post, demoRng);
                 PostManager.ApplyDecisionReaction(post, playerChoseApprove: true, users: null);
                 PostManager.RefreshEngagementLabel(post);
                 posts.Add(post);
@@ -90,15 +90,13 @@ namespace GlitchInTheSystem.Social
                     authorUserId = PreviewUserId,
                     text = s.Item1,
                     timestampLabel = $"{(i + 1) * 12}m",
-                    likes = 1200 + i * 840,
-                    shares = 90 + i * 40,
-                    comments = s.Item4.Length,
                     category = s.Item2,
                     severity = s.Item2 == PostCategory.Misinformation ? 2 : 0,
-                    isPublished = true,
-                    engagementLabel = s.Item3
+                    isPublished = true
                 };
-
+                var tier = s.Item2 == PostCategory.Misinformation ? EngagementTier.Heated : EngagementTier.Normal;
+                OrganicEngagementUtility.ApplyTier(post, tier, rng);
+                ReportReasonKits.ApplyIfMissing(post, rng);
                 PostManager.AssignDefaultBranches(post, rng);
                 PostManager.ApplyDecisionReaction(post, playerChoseApprove: true, users: null);
                 PostManager.RefreshEngagementLabel(post);

@@ -20,12 +20,20 @@ namespace GlitchInTheSystem.GameData
         public string mediaSpriteId; // optional
         /// <summary>Human report copy shown in Work Dashboard (may be vague, detailed, or false).</summary>
         public string reportReason;
+
+        /// <summary>Voice of the reporter — drives which report kit was used.</summary>
+        public ReporterTone reporterTone;
+
+        /// <summary>How trustworthy the report sounds (moderator training hook).</summary>
+        public ReportCredibility reportCredibility;
         /// <summary>Caption for attached image/media when <see cref="presentationFormat"/> includes media.</summary>
         public string imageDescription;
         public PostPresentationFormat presentationFormat;
         public FeedPostKind feedKind;
         public PostCategory category; // Harmless, Violation, Misinformation, GrayArea, Narrative, AlgorithmManipulation
         public int severity;          // 0–3 for moderation priority
+        /// <summary>Caption writing style (pool-authored).</summary>
+        public PostVoice postVoice;
         public bool wasRewrittenByAlgorithm;
         public string originalText;   // if algorithm rewrote it
         public bool isPublished;      // appears in social app only when approved by moderator
@@ -33,11 +41,17 @@ namespace GlitchInTheSystem.GameData
         public bool isRemoved;
         public List<CommentData> commentPreview = new(); // Filled at moderation time from branch lists (see PostManager).
 
-        /// <summary>Short reactions if the player allows the post to go live.</summary>
+        /// <summary>Short reactions if the player allows the post to go live (legacy string list).</summary>
         public List<string> commentsApprove = new();
 
-        /// <summary>Reactions if the player blocks the post (also used for internal tone when it never publishes).</summary>
+        /// <summary>Reactions if the player blocks the post (legacy string list).</summary>
         public List<string> commentsDecline = new();
+
+        /// <summary>Authored approve thread — preferred over <see cref="commentsApprove"/> when non-empty.</summary>
+        public List<PostCommentLine> approveThread = new();
+
+        /// <summary>Authored decline thread — preferred over <see cref="commentsDecline"/> when non-empty.</summary>
+        public List<PostCommentLine> declineThread = new();
 
         /// <summary>Like count shown in the feed after an approve decision (can be huge for viral misinformation).</summary>
         public int likesApprove;
@@ -50,6 +64,15 @@ namespace GlitchInTheSystem.GameData
 
         /// <summary>Set from like count for feed chips, e.g. TRENDING or LOW ENGAGEMENT.</summary>
         public string engagementLabel;
+
+        /// <summary>Cohesive engagement band — likes/shares/comments were derived together.</summary>
+        public EngagementTier engagementTier;
+
+        /// <summary>
+        /// When true, engagement uses <see cref="EngagementTier.ManipulatedRound"/> (clean round counts).
+        /// Set by Algorithm systems when they boost a post — never for ordinary procedural rolls.
+        /// </summary>
+        public bool algorithmEngagementManipulated;
 
         public string EngagementDisplay => $"Likes {likes:N0}  •  Shares {shares:N0}  •  Comments {comments:N0}";
     }

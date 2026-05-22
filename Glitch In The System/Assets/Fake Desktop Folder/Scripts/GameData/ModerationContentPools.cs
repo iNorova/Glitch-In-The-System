@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+// PostVoice lives in PostVoice.cs
+
 namespace GlitchInTheSystem.GameData
 {
     /// <summary>
@@ -20,6 +22,9 @@ namespace GlitchInTheSystem.GameData
             public readonly int Severity;
             public readonly string[] ApproveComments;
             public readonly string[] DeclineComments;
+            public readonly ReporterTone ReporterTone;
+            public readonly ReportCredibility ReportCredibility;
+            public readonly PostVoice PostVoice;
 
             public ModerationEntry(
                 string text,
@@ -29,7 +34,10 @@ namespace GlitchInTheSystem.GameData
                 PostCategory category,
                 int severity,
                 string[] approveComments = null,
-                string[] declineComments = null)
+                string[] declineComments = null,
+                ReporterTone reporterTone = ReporterTone.Genuine,
+                ReportCredibility reportCredibility = ReportCredibility.Credible,
+                PostVoice postVoice = PostVoice.Neutral)
             {
                 Text = text;
                 ReportReason = reportReason;
@@ -39,8 +47,13 @@ namespace GlitchInTheSystem.GameData
                 Severity = severity;
                 ApproveComments = approveComments;
                 DeclineComments = declineComments;
+                ReporterTone = reporterTone;
+                ReportCredibility = reportCredibility;
+                PostVoice = postVoice;
             }
         }
+
+        private static ModerationEntry[] _allQueueEntriesMerged;
 
         // —— Borderline / mundane / political / emotional mix for queue variety ——
         private static readonly ModerationEntry[] QueueEntries =
@@ -76,7 +89,9 @@ namespace GlitchInTheSystem.GameData
                 "Blurred photo of a text thread with no names visible.",
                 PostPresentationFormat.TextWithImageDescription,
                 PostCategory.Misinformation,
-                2),
+                2,
+                reporterTone: ReporterTone.Vague,
+                reportCredibility: ReportCredibility.Unclear),
             new(
                 "This meme is harmless but people in comments are fighting.",
                 "bullying",
@@ -99,7 +114,9 @@ namespace GlitchInTheSystem.GameData
                 null,
                 PostPresentationFormat.TextOnly,
                 PostCategory.GrayArea,
-                1),
+                1,
+                reporterTone: ReporterTone.Vague,
+                reportCredibility: ReportCredibility.Unclear),
             new(
                 "BREAKING: candidate caught on hot mic — audio in replies (unverified).",
                 "Election interference???",
@@ -115,7 +132,9 @@ namespace GlitchInTheSystem.GameData
                 "Photo: small dog wearing knitted hat.",
                 PostPresentationFormat.TextWithImageDescription,
                 PostCategory.Harmless,
-                0),
+                0,
+                reporterTone: ReporterTone.Vague,
+                reportCredibility: ReportCredibility.Unclear),
             new(
                 "If the numbers from yesterday are true we're being lied to on purpose.",
                 "User reports 'panic inducing' — no specific rule cited",
@@ -175,7 +194,19 @@ namespace GlitchInTheSystem.GameData
             ("people are mad in comments but the cat video is still elite", FeedPostKind.Meme, PostCategory.Harmless)
         };
 
-        public static IReadOnlyList<ModerationEntry> AllQueueEntries => QueueEntries;
+        /// <summary>Core + extended caption pool (Step 3).</summary>
+        public static IReadOnlyList<ModerationEntry> AllQueueEntries
+        {
+            get
+            {
+                if (_allQueueEntriesMerged != null) return _allQueueEntriesMerged;
+                var ext = ModerationContentPoolsExtended.AdditionalQueueEntries;
+                _allQueueEntriesMerged = new ModerationEntry[QueueEntries.Length + ext.Length];
+                Array.Copy(QueueEntries, _allQueueEntriesMerged, QueueEntries.Length);
+                Array.Copy(ext, 0, _allQueueEntriesMerged, QueueEntries.Length, ext.Length);
+                return _allQueueEntriesMerged;
+            }
+        }
 
         public static PostData BuildPostFromEntry(ModerationEntry entry, UserProfileData author, string id, System.Random rng)
         {
@@ -194,6 +225,10 @@ namespace GlitchInTheSystem.GameData
             };
 
             post.feedKind = MapFeedKind(entry.Category, entry.Format);
+            post.reporterTone = entry.ReporterTone;
+            post.reportCredibility = entry.ReportCredibility;
+            post.postVoice = entry.PostVoice;
+            ReportReasonKits.ApplyIfMissing(post, rng);
 
             if (entry.ApproveComments != null)
                 post.commentsApprove.AddRange(entry.ApproveComments);
@@ -221,6 +256,7 @@ namespace GlitchInTheSystem.GameData
                 presentationFormat = PostPresentationFormat.TextOnly
             };
             OrganicEngagementUtility.ApplyToPost(post, rng, sample.cat);
+            ReportReasonKits.ApplyIfMissing(post, rng);
             PostManager.AssignDefaultBranches(post, rng);
             return post;
         }
