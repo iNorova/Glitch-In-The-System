@@ -23,6 +23,8 @@ namespace GlitchInTheSystem.Intro
         [Header("Skip")]
         [SerializeField] private bool allowSkip = true;
         [SerializeField] private KeyCode skipKey = KeyCode.Escape;
+        [Tooltip("When enabled, plays boot/welcome/tutorial even if GITMS_IntroSeen was saved (useful while testing).")]
+        [SerializeField] private bool alwaysPlayIntro;
 
         [Header("Boot UI")]
         [SerializeField] private GameObject bootPanel;
@@ -72,7 +74,7 @@ namespace GlitchInTheSystem.Intro
         private void Awake()
         {
             AutoBindIfMissing();
-            FixCollapsedIntroCanvasOnce();
+            EnsureIntroOverlayVisible();
             EnsureIntroOverlayCanvasGroup();
             SetIntroOverlayBlocksRaycasts(true);
             HideAllIntroPanels();
@@ -81,33 +83,31 @@ namespace GlitchInTheSystem.Intro
 #endif
         }
 
-        /// <summary>If the intro <see cref="Canvas"/> RectTransform scale is collapsed to zero, UI never renders (common editor mistake).</summary>
-        private void FixCollapsedIntroCanvasOnce()
+        /// <summary>
+        /// Intro Canvas is often saved at scale (0,0,0) in the scene — that hides the boot CMD and every intro panel.
+        /// </summary>
+        private void EnsureIntroOverlayVisible()
         {
-            var probe = bootPanel != null
-                ? bootPanel
-                : welcomePanel != null
-                    ? welcomePanel
-                    : tutorialHintPanel != null
-                        ? tutorialHintPanel
-                        : dayCardPanel;
-            if (probe == null) return;
-
-            Canvas canvas = probe.GetComponentInParent<Canvas>(true);
+            Canvas canvas = ResolveIntroCanvas();
             if (canvas == null) return;
 
-            _cachedIntroCanvas = canvas;
+            if (!canvas.gameObject.activeSelf)
+                canvas.gameObject.SetActive(true);
 
             Transform t = canvas.transform;
             Vector3 s = t.localScale;
             float m = Mathf.Max(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
-            if (m > 1e-3f) return;
+            if (m < 1e-3f)
+            {
+                t.localScale = Vector3.one;
+                Debug.LogWarning(
+                    $"{nameof(IntroManager)}: Intro Canvas \"{canvas.name}\" had collapsed scale ({s}); reset to (1,1,1).",
+                    canvas);
+            }
 
-            t.localScale = Vector3.one;
-            Debug.LogWarning(
-                $"{nameof(IntroManager)}: Intro Canvas \"{canvas.name}\" had collapsed scale ({s}); reset to (1,1,1). " +
-                "Boot / welcome panels would otherwise be invisible.",
-                canvas);
+            EnsureIntroOverlayCanvasGroup();
+            if (_introRootCanvasGroup != null)
+                _introRootCanvasGroup.alpha = 1f;
         }
 
         private void OnEnable()
@@ -126,7 +126,7 @@ namespace GlitchInTheSystem.Intro
             if (!allowSkip) return;
 
             // Only allow skipping while intro has not completed (avoid touching Input APIs after Day 1 starts).
-            if (PlayerPrefs.GetInt(PlayerPrefsIntroSeen, 0) == 1)
+            if (!alwaysPlayIntro && PlayerPrefs.GetInt(PlayerPrefsIntroSeen, 0) == 1)
                 return;
 
 #if ENABLE_INPUT_SYSTEM
@@ -197,7 +197,7 @@ namespace GlitchInTheSystem.Intro
 
         private void TryStartOrSkip()
         {
-            if (allowSkip && PlayerPrefs.GetInt(PlayerPrefsIntroSeen, 0) == 1)
+            if (!alwaysPlayIntro && allowSkip && PlayerPrefs.GetInt(PlayerPrefsIntroSeen, 0) == 1)
             {
                 StartDay1Session();
                 return;
@@ -222,9 +222,15 @@ namespace GlitchInTheSystem.Intro
 
         private IEnumerator RunBootSequence()
         {
+            EnsureIntroOverlayVisible();
             SetIntroOverlayBlocksRaycasts(true);
+            PrepareBootCmdPanel();
             ShowOnly(bootPanel);
-            if (bootText != null) bootText.text = "";
+            if (bootText != null)
+            {
+                bootText.text = "";
+                bootText.ForceMeshUpdate();
+            }
 
             var lines = BuildBootLines();
             foreach (var line in lines)
@@ -632,7 +638,49 @@ namespace GlitchInTheSystem.Intro
         private void AppendBootLine(string line)
         {
             if (bootText == null) return;
-            bootText.text = string.IsNullOrEmpty(bootText.text) ? line : $"{bootText.text}\n{line}";
+            string cmdLine = line.StartsWith(">") || line.StartsWith("<") ? line : $"> {line}";
+            bootText.text = string.IsNullOrEmpty(bootText.text) ? cmdLine : $"{bootText.text}\n{cmdLine}";
+        }
+
+        /// <summary>Full-screen black terminal for the boot CMD lines (green <see cref="TMP_Text"/>).</summary>
+        private void PrepareBootCmdPanel()
+        {
+            if (bootPanel == null) return;
+
+            if (bootText == null)
+                bootText = bootPanel.GetComponentInChildren<TMP_Text>(true);
+
+            var rt = bootPanel.transform as RectTransform;
+            var img = bootPanel.GetComponent<Image>();
+            Canvas canvas = ResolveIntroCanvas();
+            var root = canvas != null ? canvas.transform as RectTransform : null;
+            if (root != null && rt != null && rt.parent != root)
+                rt.SetParent(root, false);
+
+            ScreenFadeUtility.ApplyReferenceResolution(rt, DayCardOverlayWidth, DayCardOverlayHeight, img);
+            ScreenFadeUtility.ApplyFullBleed(rt, img);
+            if (img != null)
+                img.color = Color.black;
+
+            if (bootText == null) return;
+
+            RectTransform textRt = bootText.rectTransform;
+            if (textRt.parent != rt)
+                textRt.SetParent(rt, false);
+
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.pivot = new Vector2(0, 1f);
+            textRt.offsetMin = new Vector2(56f, 56f);
+            textRt.offsetMax = new Vector2(-56f, -56f);
+            textRt.anchoredPosition = Vector2.zero;
+            textRt.localScale = Vector3.one;
+
+            bootText.alignment = TextAlignmentOptions.TopLeft;
+            bootText.enableWordWrapping = true;
+            bootText.fontSize = 28;
+            bootText.color = new Color(0.2f, 1f, 0.4f, 1f);
+            bootText.raycastTarget = false;
         }
 
         private void HideAllIntroPanels()
@@ -762,6 +810,16 @@ namespace GlitchInTheSystem.Intro
 
         private void AutoBindIfMissing()
         {
+            if (bootText == null && bootPanel != null)
+                bootText = bootPanel.GetComponentInChildren<TMP_Text>(true);
+
+            if (introUiRoot == null)
+            {
+                Canvas canvas = ResolveIntroCanvas();
+                if (canvas != null)
+                    introUiRoot = canvas.gameObject;
+            }
+
             if (workDashboard != null) return;
 #if UNITY_2023_1_OR_NEWER
             workDashboard = FindFirstObjectByType<WorkDashboardController>();
