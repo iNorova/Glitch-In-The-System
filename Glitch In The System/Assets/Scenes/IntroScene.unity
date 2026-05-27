@@ -1636,7 +1636,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GlitchInTheSystem.Intro.IntroManager
   allowSkip: 1
   skipKey: 27
-  alwaysPlayIntro: 0
+  alwaysPlayIntro: 1
   bootPanel: {fileID: 1529280054}
   bootText: {fileID: 1260380614}
   bootLineDelay: 0.18

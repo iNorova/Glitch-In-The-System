@@ -17,6 +17,8 @@ public sealed class DesktopAppWindow : MonoBehaviour, IPointerDownHandler, IBegi
         if (startClosed) windowRoot.SetActive(false);
     }
 
+    public bool IsOpen => windowRoot != null && windowRoot.activeSelf;
+
     public void Open()
     {
         if (windowRoot == null) return;
@@ -28,6 +30,16 @@ public sealed class DesktopAppWindow : MonoBehaviour, IPointerDownHandler, IBegi
         BringToFront();
         // Let panel OnEnable drive session init to avoid double-StartSession races.
         if (!windowRoot.activeSelf) windowRoot.SetActive(true);
+    }
+
+    /// <summary>
+    /// Opens the window without toggle behavior. Safe for intro/tutorial flows.
+    /// </summary>
+    public void OpenIfClosed()
+    {
+        if (windowRoot == null) return;
+        if (!windowRoot.activeSelf) windowRoot.SetActive(true);
+        BringToFront();
     }
 
     public void Close()

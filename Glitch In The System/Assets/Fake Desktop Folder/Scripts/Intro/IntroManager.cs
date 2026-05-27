@@ -247,7 +247,7 @@ namespace GlitchInTheSystem.Intro
                 // Tiny glitch flicker: very rare extra blank line.
                 if (Random.value < 0.08f)
                 {
-                    AppendBootLine("<alpha=#66>…</alpha>");
+                    AppendBootLine("<alpha=#66>…");
                     yield return new WaitForSecondsRealtime(0.05f);
                 }
             }
@@ -268,7 +268,7 @@ namespace GlitchInTheSystem.Intro
                     "<b>Welcome to Flairline Media Moderation</b>\n\n" +
                     "Your responsibility is to maintain platform safety and engagement.\n\n" +
                     "You will review posts from the Central Feed and choose what goes live.\n\n" +
-                    "<alpha=#AA>Tip: Approve publishes. Remove blocks. Flag escalates uncertain cases.</alpha>";
+                    "<alpha=#AA>Tip: Approve publishes. Remove blocks. Flag escalates uncertain cases.";
             }
 
             bool clicked = false;
@@ -490,7 +490,7 @@ namespace GlitchInTheSystem.Intro
                 dayCardText.fontSize = 40;
                 dayCardText.color = Color.white;
                 dayCardText.text =
-                    "<size=48><b>Tutorial complete</b></size>\n\n<size=24><alpha=#CC>Preparing Day 1...</alpha></size>";
+                    "<size=48><b>Tutorial complete</b></size>\n\n<size=24><alpha=#CC>Preparing Day 1...";
             }
 
             CanvasGroup group = ScreenFadeUtility.EnsureCanvasGroup(dayCardPanel);
@@ -626,7 +626,7 @@ namespace GlitchInTheSystem.Intro
             // decisionsMade is "completed so far", so next index is decisionsMade.
             int next = Mathf.Clamp(decisionsMade, 0, IntroTutorialContent.TutorialPostCount - 1);
             int step = next + 1;
-            string progress = $"<alpha=#99>{step} / {IntroTutorialContent.TutorialPostCount}</alpha>";
+            string progress = $"<alpha=#99>{step} / {IntroTutorialContent.TutorialPostCount}";
             tutorialHintText.text = next switch
             {
                 0 => $"{progress}\n<b>Harmless post</b>\nClick <b>APPROVE</b> to publish.",
@@ -646,7 +646,7 @@ namespace GlitchInTheSystem.Intro
                 "Connecting to Central Feed...",
                 "Loading user safety protocols...",
                 "Verifying workstation policies...",
-                "<alpha=#88>Diagnostic: minor signal variance detected</alpha>",
+                "<alpha=#88>Diagnostic: minor signal variance detected",
                 "Launching Work Dashboard...",
                 "Ready."
             };
@@ -812,7 +812,12 @@ namespace GlitchInTheSystem.Intro
 
             var app = workDashboard.GetComponent<DesktopAppWindow>();
             if (app != null)
-                app.Open();
+            {
+                // Window root can be closed even while controller object is active.
+                // Use a non-toggle open path so tutorial always reveals the moderation window.
+                app.OpenIfClosed();
+                workDashboard.gameObject.SetActive(true);
+            }
             else if (!workDashboard.gameObject.activeInHierarchy)
                 workDashboard.gameObject.SetActive(true);
 
@@ -839,10 +844,26 @@ namespace GlitchInTheSystem.Intro
 
             if (workDashboard != null) return;
 #if UNITY_2023_1_OR_NEWER
-            workDashboard = FindFirstObjectByType<WorkDashboardController>();
+            workDashboard = FindFirstObjectByType<WorkDashboardController>(FindObjectsInactive.Include);
 #else
-            workDashboard = FindObjectOfType<WorkDashboardController>();
+            workDashboard = FindObjectOfType<WorkDashboardController>(true);
 #endif
+        }
+
+        [ContextMenu("Debug/Reset Intro Seen Flag")]
+        private void DebugResetIntroSeenFlag()
+        {
+            PlayerPrefs.DeleteKey(PlayerPrefsIntroSeen);
+            PlayerPrefs.Save();
+            Debug.Log($"{nameof(IntroManager)}: Cleared PlayerPrefs key '{PlayerPrefsIntroSeen}'.", this);
+        }
+
+        [ContextMenu("Debug/Mark Intro Seen")]
+        private void DebugMarkIntroSeenFlag()
+        {
+            PlayerPrefs.SetInt(PlayerPrefsIntroSeen, 1);
+            PlayerPrefs.Save();
+            Debug.Log($"{nameof(IntroManager)}: Set PlayerPrefs key '{PlayerPrefsIntroSeen}' to seen.", this);
         }
     }
 }

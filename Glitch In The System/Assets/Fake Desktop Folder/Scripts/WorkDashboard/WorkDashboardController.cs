@@ -293,7 +293,7 @@ public sealed class WorkDashboardController : MonoBehaviour
             dayTransitionText.fontSize = 36;
             dayTransitionText.alignment = TextAlignmentOptions.Center;
             dayTransitionText.text =
-                $"<size=58><b>DAY {nextDay}</b></size>\n\n<size=24><alpha=#BB>Day {completedDay} complete.</alpha></size>";
+                $"<size=58><b>DAY {nextDay}</b></size>\n\n<size=24><alpha=#BB>Day {completedDay} complete.";
         }
 
         CanvasGroup group = ScreenFadeUtility.EnsureCanvasGroup(dayTransitionPanel.gameObject);

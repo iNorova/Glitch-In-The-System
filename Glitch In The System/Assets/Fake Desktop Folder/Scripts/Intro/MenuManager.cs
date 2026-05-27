@@ -37,8 +37,14 @@ namespace GlitchInTheSystem.Intro
         [Header("Welcome Image (after Login click)")]
         [Tooltip("Image (CanvasGroup) that fades in when the player clicks Login. Example: welcome_screen-draft image.")]
         [SerializeField] private CanvasGroup welcomeImageGroup;
+        [Tooltip("Optional TMP text shown during welcome stage (e.g. 'Please Wait...').")]
+        [SerializeField] private TMP_Text welcomeStatusText;
+        [SerializeField] private string welcomeStatusLabel = "Please Wait";
+        [SerializeField] private float welcomeStatusDelaySeconds = 1f;
         [Tooltip("If true, welcome image fades in while the fake authentication dots are playing.")]
         [SerializeField] private bool fadeWelcomeDuringAuth = true;
+        [Tooltip("When fadeWelcomeDuringAuth is false, this is how long the welcome image stays before scene load.")]
+        [SerializeField] private float welcomeHoldSecondsAfterAuth = 0.9f;
         [Tooltip("If true, hides the login panel while the welcome image is visible.")]
         [SerializeField] private bool hideLoginPanelDuringWelcome = true;
 
@@ -115,6 +121,8 @@ namespace GlitchInTheSystem.Intro
                 welcomeImageGroup.blocksRaycasts = false;
                 welcomeImageGroup.interactable = false;
             }
+
+            SetWelcomeStatusVisible(false);
 
             if (crtOverlayGroup != null)
             {
@@ -247,6 +255,7 @@ namespace GlitchInTheSystem.Intro
                 welcomeImageGroup.blocksRaycasts = false;
                 welcomeImageGroup.interactable = false;
             }
+            SetWelcomeStatusVisible(false);
 
             if (loginPanelGroup != null && hideLoginPanelDuringWelcome)
             {
@@ -256,6 +265,7 @@ namespace GlitchInTheSystem.Intro
 
             float elapsed = 0f;
             int dots = 0;
+            float welcomeVisibleAt = -1f;
             while (elapsed < authenticationSeconds)
             {
                 elapsed += loadingDotStepSeconds;
@@ -269,6 +279,16 @@ namespace GlitchInTheSystem.Intro
                     // Ease-in for a smoother UI fade.
                     float eased = p * p * (3f - 2f * p);
                     welcomeImageGroup.alpha = eased;
+                    if (eased > 0.01f)
+                    {
+                        if (welcomeVisibleAt < 0f)
+                            welcomeVisibleAt = elapsed;
+
+                        bool showWait = (elapsed - welcomeVisibleAt) >= Mathf.Max(0f, welcomeStatusDelaySeconds);
+                        SetWelcomeStatusVisible(showWait);
+                        if (showWait)
+                            UpdateWelcomeStatusWithDots(dots);
+                    }
 
                     if (loginPanelGroup != null && hideLoginPanelDuringWelcome)
                         loginPanelGroup.alpha = 1f - eased;
@@ -276,26 +296,53 @@ namespace GlitchInTheSystem.Intro
                 yield return new WaitForSecondsRealtime(Mathf.Max(0.05f, loadingDotStepSeconds));
             }
 
-            // Smooth transition mask right before loading the next scene.
-            if (blackOverlay != null) blackOverlay.blocksRaycasts = true;
-
-            float t = 0f;
-            while (t < sceneFadeOutSeconds)
+            // If welcome fade is disabled, show welcome AFTER auth timer finishes.
+            if (welcomeImageGroup != null && !fadeWelcomeDuringAuth)
             {
-                t += Time.unscaledDeltaTime;
-                float k = sceneFadeOutSeconds <= 0f ? 1f : Mathf.Clamp01(t / sceneFadeOutSeconds);
+                welcomeImageGroup.alpha = 1f;
+                SetWelcomeStatusVisible(false);
+                if (loginPanelGroup != null && hideLoginPanelDuringWelcome)
+                    loginPanelGroup.alpha = 0f;
 
-                if (blackOverlay != null) blackOverlay.alpha = k;
-                if (loginPanelGroup != null) loginPanelGroup.alpha = 1f - k;
-                if (welcomeImageGroup != null) welcomeImageGroup.alpha = 1f - k;
-
-                yield return null;
+                float holdElapsed = 0f;
+                int waitDots = 0;
+                float waitStep = Mathf.Max(0.05f, loadingDotStepSeconds);
+                float waitHold = Mathf.Max(0f, welcomeHoldSecondsAfterAuth);
+                while (holdElapsed < waitHold)
+                {
+                    holdElapsed += waitStep;
+                    waitDots = (waitDots + 1) % 4;
+                    bool showWait = holdElapsed >= Mathf.Max(0f, welcomeStatusDelaySeconds);
+                    SetWelcomeStatusVisible(showWait);
+                    if (showWait)
+                        UpdateWelcomeStatusWithDots(waitDots);
+                    yield return new WaitForSecondsRealtime(waitStep);
+                }
             }
+
+            // No extra fade-out here: keep welcome/auth state visible, then continue.
+            if (blackOverlay != null)
+                blackOverlay.blocksRaycasts = true;
 
             if (!string.IsNullOrWhiteSpace(nextSceneName))
                 SceneManager.LoadScene(nextSceneName);
 
             _busy = false;
+        }
+
+        private void SetWelcomeStatusVisible(bool visible)
+        {
+            if (welcomeStatusText == null) return;
+            welcomeStatusText.gameObject.SetActive(visible);
+            if (visible)
+                welcomeStatusText.text = welcomeStatusLabel;
+        }
+
+        private void UpdateWelcomeStatusWithDots(int dotCount)
+        {
+            if (welcomeStatusText == null || !welcomeStatusText.gameObject.activeSelf) return;
+            int clamped = Mathf.Clamp(dotCount, 0, 3);
+            welcomeStatusText.text = welcomeStatusLabel + new string('.', clamped);
         }
 
         private IEnumerator ShutdownFlow()
