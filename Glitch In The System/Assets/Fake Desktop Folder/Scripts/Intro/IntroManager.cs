@@ -489,6 +489,9 @@ namespace GlitchInTheSystem.Intro
                 dayCardText.enableAutoSizing = false;
                 dayCardText.fontSize = 40;
                 dayCardText.color = Color.white;
+                dayCardText.alignment = TextAlignmentOptions.Center;
+                dayCardText.textWrappingMode = TextWrappingModes.NoWrap;
+                dayCardText.overflowMode = TextOverflowModes.Overflow;
                 dayCardText.text =
                     "<size=48><b>Tutorial complete</b></size>\n\n<size=24><alpha=#CC>Preparing Day 1...";
             }
@@ -626,7 +629,7 @@ namespace GlitchInTheSystem.Intro
             // decisionsMade is "completed so far", so next index is decisionsMade.
             int next = Mathf.Clamp(decisionsMade, 0, IntroTutorialContent.TutorialPostCount - 1);
             int step = next + 1;
-            string progress = $"<alpha=#99>{step} / {IntroTutorialContent.TutorialPostCount}";
+            string progress = $"<alpha=#99>TUTORIAL {step} / {IntroTutorialContent.TutorialPostCount}";
             tutorialHintText.text = next switch
             {
                 0 => $"{progress}\n<b>Harmless post</b>\nClick <b>APPROVE</b> to publish.",
