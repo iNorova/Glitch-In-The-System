@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -58,6 +59,11 @@ namespace GlitchInTheSystem.Intro
         [Header("Teardown")]
         [Tooltip("Optional root to disable after intro finishes or when skipping repeat play — usually the Intro Canvas GameObject. If empty, inferred from Boot/Welcome panels.")]
         [SerializeField] private GameObject introUiRoot;
+
+        [Header("Scene Transition")]
+        [Tooltip("If enabled, intro ends by loading gameplaySceneName instead of starting gameplay in the same scene.")]
+        [SerializeField] private bool loadGameplaySceneAfterIntro = true;
+        [SerializeField] private string gameplaySceneName = "GameplayScene";
 
         private Coroutine _flow;
         private int _tutorialDecisions;
@@ -217,7 +223,7 @@ namespace GlitchInTheSystem.Intro
             yield return RunDayCard();
 
             MarkIntroSeen();
-            StartDay1Session();
+            CompleteIntro();
         }
 
         private IEnumerator RunBootSequence()
@@ -546,6 +552,17 @@ namespace GlitchInTheSystem.Intro
             SetIntroOverlayBlocksRaycasts(true);
             if (_flow != null) StopCoroutine(_flow);
             MarkIntroSeen();
+            CompleteIntro();
+        }
+
+        private void CompleteIntro()
+        {
+            if (loadGameplaySceneAfterIntro && !string.IsNullOrWhiteSpace(gameplaySceneName))
+            {
+                SceneManager.LoadScene(gameplaySceneName);
+                return;
+            }
+
             StartDay1Session();
         }
 
@@ -677,7 +694,7 @@ namespace GlitchInTheSystem.Intro
             textRt.localScale = Vector3.one;
 
             bootText.alignment = TextAlignmentOptions.TopLeft;
-            bootText.enableWordWrapping = true;
+            bootText.textWrappingMode = TextWrappingModes.Normal;
             bootText.fontSize = 28;
             bootText.color = new Color(0.2f, 1f, 0.4f, 1f);
             bootText.raycastTarget = false;
