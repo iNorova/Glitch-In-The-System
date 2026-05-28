@@ -5453,7 +5453,7 @@ MonoBehaviour:
   feedContent: {fileID: 2080856236}
   feedScrollRect: {fileID: 2144475112}
   refreshButton: {fileID: 607062409}
-  autoRefreshSeconds: 2
+  autoRefreshSeconds: 0
   forceRuntimeFeedHost: 1
   wheelScrollSpeed: 200
   usePostDesignTemplate: 1
