@@ -1,3 +1,4 @@
+using System;
 using GlitchInTheSystem.Algorithm;
 using GlitchInTheSystem.GameData;
 using GlitchInTheSystem.UI;
@@ -10,7 +11,12 @@ namespace GlitchInTheSystem.Social
     /// <summary>Updates text on scene-authored editor feed cards (does not change RectTransforms).</summary>
     public static class SocialMediaFeedCardBinder
     {
-        public static void Apply(Transform cardRoot, PostData post, UserProfileData user, bool expandComments)
+        public static void Apply(
+            Transform cardRoot,
+            PostData post,
+            UserProfileData user,
+            bool expandComments,
+            Func<string, UserProfileData> getCommentUser = null)
         {
             if (cardRoot == null || post == null) return;
 
@@ -96,7 +102,10 @@ namespace GlitchInTheSystem.Social
                     if (commentCount > 0 && i < post.commentPreview.Count)
                     {
                         var c = post.commentPreview[i];
-                        string commenter = SocialMediaFeedPresentation.CommentAuthorLabel(c);
+                        var commentUser = getCommentUser?.Invoke(c.authorUserId);
+                        if (commentUser == null && user != null && user.id == c.authorUserId)
+                            commentUser = user;
+                        string commenter = SocialMediaFeedPresentation.CommentAuthorLabel(c, commentUser);
                         line.text = $"{commenter}: {SocialMediaFeedPresentation.SanitizeForTMP(c.text)}";
                     }
                     else if (isEditorPreview)
