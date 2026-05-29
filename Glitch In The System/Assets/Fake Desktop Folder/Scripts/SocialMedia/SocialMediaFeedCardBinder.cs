@@ -63,16 +63,20 @@ namespace GlitchInTheSystem.Social
             }
 
             int commentCount = post.commentPreview?.Count ?? 0;
+            bool hasComments = commentCount > 0;
 
             var commentsSection = cardRoot.Find("CommentsSection");
             if (commentsSection != null)
-                commentsSection.gameObject.SetActive(commentCount > 0);
+                commentsSection.gameObject.SetActive(hasComments);
 
             foreach (var toggle in cardRoot.GetComponentsInChildren<Button>(true))
             {
                 if (toggle == null || toggle.name != "ActionButton" && toggle.name != "CommentsToggle") continue;
+                toggle.gameObject.SetActive(hasComments);
+                if (!hasComments) continue;
+
                 var label = toggle.GetComponentInChildren<TMP_Text>(true);
-                if (label != null && commentCount > 0)
+                if (label != null)
                     label.text = $"Comments ({commentCount})";
             }
 
