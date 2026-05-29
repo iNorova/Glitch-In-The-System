@@ -117,6 +117,7 @@ namespace GlitchInTheSystem.Interruptions
         private float _nextTriggerTime;
         private Color _overlayBaseColor;
         private readonly List<Vector2> _spawnedPopupPositions = new();
+        private readonly HashSet<ErrorPopup> _closedPopups = new();
         private Coroutine _sequenceRoutine;
         private float _spawnMinX;
         private float _spawnMaxX;
@@ -475,6 +476,7 @@ namespace GlitchInTheSystem.Interruptions
 
             _interruptionActive = true;
             _interruptionsTriggeredToday++;
+            _closedPopups.Clear();
 
             workDashboard?.SetModerationLocked(true);
 
@@ -555,6 +557,7 @@ namespace GlitchInTheSystem.Interruptions
             _interruptionActive = false;
             _captchaMusicActive = false;
             _sequenceRoutine = null;
+            _closedPopups.Clear();
 
             if (_popupGlitchRoutine != null)
             {
@@ -688,6 +691,12 @@ namespace GlitchInTheSystem.Interruptions
 
         public void NotifyPopupClosed(ErrorPopup popup)
         {
+            if (!_interruptionActive)
+                return;
+
+            if (popup != null && !_closedPopups.Add(popup))
+                return;
+
             PlayClip(popupCloseClip);
             _remainingPopups = Mathf.Max(0, _remainingPopups - 1);
             TryEndInterruption();
@@ -723,6 +732,7 @@ namespace GlitchInTheSystem.Interruptions
             StopMinigameBackground();
 
             _interruptionActive = false;
+            _closedPopups.Clear();
             DesktopUiStackOrder.SetInterruptionBlocking(false);
             workDashboard?.SetModerationLocked(false);
             ScheduleNextTrigger();
