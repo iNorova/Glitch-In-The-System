@@ -515,7 +515,7 @@ public sealed class WorkDashboardController : MonoBehaviour
         string lastAuthor = ResolveLastModeratedAuthorHandle();
         string outcomeLine = BuildOutcomeLabelForCurrentPost(finalApproved, overridden, playerReason);
 
-        AppendHistoryEntry(finalApproved, currentPerson, currentPost, overridden);
+        AppendHistoryEntry(finalApproved, currentPerson, currentPost, overridden, playerReason);
         currentIndex++;
 
         if (useGameDatabase && GameDatabase.Instance != null)
@@ -684,7 +684,7 @@ public sealed class WorkDashboardController : MonoBehaviour
             : $"Day {dayNumber} — Posts: {completed}/{postsPerSession}";
     }
 
-    private void AppendHistoryEntry(bool approved, Person person, Post post, bool overridden = false)
+    private void AppendHistoryEntry(bool approved, Person person, Post post, bool overridden = false, string playerReason = null)
     {
         if (decisionHistoryContent == null) return;
 
@@ -695,9 +695,16 @@ public sealed class WorkDashboardController : MonoBehaviour
         tmp.fontSize = 14;
         tmp.raycastTarget = false;
         tmp.textWrappingMode = TMPro.TextWrappingModes.Normal;
+        bool flagged = !overridden
+                       && !approved
+                       && !string.IsNullOrEmpty(playerReason)
+                       && playerReason.StartsWith(ModerationDecisionFeedback.FlagReasonPrefix, StringComparison.Ordinal);
+        string verb = flagged ? "FLAGGED" : (approved ? "APPROVED" : "DECLINED");
         string suffix = overridden ? " (OVERRIDDEN)" : "";
-        tmp.text = $"{(approved ? "APPROVED" : "DECLINED")}{suffix}  •  @{person.Username}  •  {TrimOneLine(post.Text, 60)}";
-        tmp.color = approved ? new Color(0.65f, 1f, 0.72f, 1f) : new Color(1f, 0.70f, 0.70f, 1f);
+        tmp.text = $"{verb}{suffix}  •  @{person.Username}  •  {TrimOneLine(post.Text, 60)}";
+        tmp.color = flagged ? new Color(1f, 0.86f, 0.45f, 1f)
+            : approved ? new Color(0.65f, 1f, 0.72f, 1f)
+            : new Color(1f, 0.70f, 0.70f, 1f);
 
         var rt = (RectTransform)go.transform;
         rt.anchorMin = new Vector2(0, 1);
