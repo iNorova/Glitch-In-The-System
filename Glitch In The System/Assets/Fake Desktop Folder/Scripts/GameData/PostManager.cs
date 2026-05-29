@@ -61,32 +61,32 @@ namespace GlitchInTheSystem.GameData
         }
 
         /// <summary>
-        /// When the player clicks Approve, <paramref name="playerChoseApprove"/> is true and approve-branch data is used; otherwise decline-branch.
+        /// Applies the public-facing reaction branch for the final moderated outcome.
         /// </summary>
-        public static void ApplyDecisionReaction(PostData post, bool playerChoseApprove, IReadOnlyList<UserProfileData> users)
+        public static void ApplyDecisionReaction(PostData post, bool approvedOutcome, IReadOnlyList<UserProfileData> users)
         {
             if (post == null) return;
 
             bool hasBranchLikes = post.likesApprove > 0 || post.likesDecline > 0;
             if (hasBranchLikes)
-                post.likes = Mathf.Max(0, playerChoseApprove ? post.likesApprove : post.likesDecline);
+                post.likes = Mathf.Max(0, approvedOutcome ? post.likesApprove : post.likesDecline);
 
-            var thread = playerChoseApprove ? post.approveThread : post.declineThread;
+            var thread = approvedOutcome ? post.approveThread : post.declineThread;
             if (thread != null && thread.Count > 0)
             {
-                post.commentPreview = BuildCommentPreviewFromThread(post, thread, playerChoseApprove, users);
+                post.commentPreview = BuildCommentPreviewFromThread(post, thread, approvedOutcome, users);
             }
             else
             {
-                IReadOnlyList<string> lines = playerChoseApprove ? post.commentsApprove : post.commentsDecline;
+                IReadOnlyList<string> lines = approvedOutcome ? post.commentsApprove : post.commentsDecline;
                 if (lines == null || lines.Count == 0)
-                    lines = GenerateContextualLines(post, playerChoseApprove);
-                post.commentPreview = BuildCommentPreview(post, lines, playerChoseApprove, users);
+                    lines = GenerateContextualLines(post, approvedOutcome);
+                post.commentPreview = BuildCommentPreview(post, lines, approvedOutcome, users);
             }
 
             if (hasBranchLikes || post.commentPreview.Count > 0)
             {
-                post.shares = Mathf.Max(0, DeriveShares(post.likes, playerChoseApprove));
+                post.shares = Mathf.Max(0, DeriveShares(post.likes, approvedOutcome));
                 // Displayed comment count matches visible preview lines (Step 4 rule).
                 post.comments = post.commentPreview.Count;
                 post.shares = Mathf.Min(post.shares, OrganicEngagementUtility.MaxSharesForLikes(post.likes));

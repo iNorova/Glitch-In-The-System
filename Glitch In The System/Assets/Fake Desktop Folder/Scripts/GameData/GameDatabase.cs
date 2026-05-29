@@ -161,7 +161,7 @@ namespace GlitchInTheSystem.GameData
             {
                 post.isRemoved = !finalApproved;
                 post.isPublished = finalApproved;
-                PostManager.ApplyDecisionReaction(post, playerChoseApprove, _users);
+                PostManager.ApplyDecisionReaction(post, finalApproved, _users);
 
                 if (postId == NarrativeIds.ViralMisinformationPostId)
                 {

@@ -39,7 +39,7 @@ namespace GlitchInTheSystem.Social
                 OrganicEngagementUtility.ApplyToPost(post, demoRng, PostCategory.Harmless);
                 ReportReasonKits.ApplyIfMissing(post, demoRng);
                 PostManager.AssignDefaultBranches(post, demoRng);
-                PostManager.ApplyDecisionReaction(post, playerChoseApprove: true, users: null);
+                PostManager.ApplyDecisionReaction(post, approvedOutcome: true, users: null);
                 PostManager.RefreshEngagementLabel(post);
                 posts.Add(post);
             }
@@ -98,7 +98,7 @@ namespace GlitchInTheSystem.Social
                 OrganicEngagementUtility.ApplyTier(post, tier, rng);
                 ReportReasonKits.ApplyIfMissing(post, rng);
                 PostManager.AssignDefaultBranches(post, rng);
-                PostManager.ApplyDecisionReaction(post, playerChoseApprove: true, users: null);
+                PostManager.ApplyDecisionReaction(post, approvedOutcome: true, users: null);
                 PostManager.RefreshEngagementLabel(post);
 
                 post.commentPreview.Clear();
