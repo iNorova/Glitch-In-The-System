@@ -12,6 +12,20 @@ namespace GlitchInTheSystem.Interruptions
     {
         [SerializeField] private ErrorPopup popupPrefab;
 
+        private bool _systemsEnsured;
+
+        private void Awake()
+        {
+            EnsureSystemsOnce();
+        }
+
+        private void EnsureSystemsOnce()
+        {
+            if (_systemsEnsured) return;
+            _systemsEnsured = true;
+            EnsureSystems();
+        }
+
         private void EnsureSystems()
         {
             var overlayRoot = gameObject;
