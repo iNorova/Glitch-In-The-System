@@ -95,6 +95,16 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     /// <summary>Set by <see cref="GlitchInTheSystem.Intro.IntroManager"/> so opening the inactive window doesn't run <see cref="StartSession"/> before the tutorial queue exists.</summary>
     private bool _suppressStartSessionOnce;
+    private bool _moderationLocked;
+
+    /// <summary>Called by <see cref="GlitchInTheSystem.Interruptions.InterruptionManager"/> during error/captcha interruptions.</summary>
+    public void SetModerationLocked(bool locked)
+    {
+        _moderationLocked = locked;
+        if (approveButton != null) approveButton.interactable = !locked;
+        if (declineButton != null) declineButton.interactable = !locked;
+        if (flagButton != null) flagButton.interactable = !locked;
+    }
 
     private static readonly string[] FirstNames = { "Avery", "Jordan", "Sam", "Taylor", "Riley", "Morgan", "Casey", "Quinn", "Jamie", "Dakota" };
     private static readonly string[] LastNames = { "Nguyen", "Patel", "Johnson", "Garcia", "Kim", "Brown", "Lopez", "Singh", "Chen", "Martinez" };
@@ -427,6 +437,7 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private void Decide(bool playerApproved, string playerReason)
     {
+        if (_moderationLocked) return;
         if (!EnsureReady()) return;
         if (currentIndex >= postsPerSession) return;
 
