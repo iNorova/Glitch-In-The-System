@@ -198,6 +198,12 @@ namespace GlitchInTheSystem.Algorithm
             algorithmTrust = trustSettings != null ? trustSettings.startingTrust : 55f;
             disagreementCount = 0;
             currentStressLevel = trustSettings != null ? trustSettings.startingStressLevel : 0f;
+            ResetDayState();
+        }
+
+        /// <summary>Clears per-day review state without wiping accumulated trust/telemetry.</summary>
+        public void ResetDayState()
+        {
             currentPostReviewSeconds = 0f;
             _manipulatedPosts.Clear();
             _activePostId = null;
