@@ -9,7 +9,12 @@ namespace GlitchInTheSystem.Interruptions
 
         public bool IsCompleted { get; private set; }
 
+        public bool IsCaptchaRunning =>
+            captchaMinigame != null && captchaMinigame.isActiveAndEnabled && captchaMinigame.IsRunning;
+
         public void Configure(CaptchaMinigame captcha) => captchaMinigame = captcha;
+
+        public void BlinkCaptchaPanel() => captchaMinigame?.PlayOutsideClickBlink();
 
         public void HideCaptcha()
         {

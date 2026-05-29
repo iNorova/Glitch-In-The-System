@@ -617,6 +617,12 @@ namespace GlitchInTheSystem.Interruptions
             PlayClip(invalidClickClip);
             MaintainMinigameMusic();
 
+            if (minigameManager != null && minigameManager.IsCaptchaRunning)
+            {
+                minigameManager.BlinkCaptchaPanel();
+                return;
+            }
+
             if (overlayBlinkImage != null)
             {
                 if (_blinkRoutine != null)
