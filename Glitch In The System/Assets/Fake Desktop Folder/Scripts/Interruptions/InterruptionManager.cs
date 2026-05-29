@@ -666,21 +666,21 @@ namespace GlitchInTheSystem.Interruptions
         {
             EnsureLoadingSpinnerRoot();
 
-            float duration = Random.Range(loadingSpinnerDurationSeconds.x, loadingSpinnerDurationSeconds.y);
-            duration = Mathf.Max(0f, duration);
-
             if (interruptionLoadingRoot != null)
             {
                 interruptionLoadingRoot.transform.SetAsLastSibling();
                 SetLoadingSpinnerVisible(true);
             }
 
-            desktopBackground?.BeginSpinnerFlicker();
+            if (desktopBackground != null)
+                yield return desktopBackground.PlaySpinnerFlickerSequence();
+            else
+            {
+                float fallback = Random.Range(loadingSpinnerDurationSeconds.x, loadingSpinnerDurationSeconds.y);
+                if (fallback > 0f)
+                    yield return new WaitForSecondsRealtime(fallback);
+            }
 
-            if (duration > 0f)
-                yield return new WaitForSecondsRealtime(duration);
-
-            desktopBackground?.StopSpinnerFlicker();
             SetLoadingSpinnerVisible(false);
         }
 

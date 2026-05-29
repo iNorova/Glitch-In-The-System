@@ -3385,7 +3385,13 @@ MonoBehaviour:
   desktopImage: {fileID: 497619816}
   normalBackground: {fileID: 6715159561020883408, guid: 135d1684b29cb8f4f91b8d34cc6cc0f0, type: 3}
   invertedBackground: {fileID: -7265268089158053380, guid: 308c0fcd03b744a07b0ca11e9f90bc4a, type: 3}
-  swapIntervalSeconds: 0.2
+  flickerSteps:
+  - delayBeforeSeconds: 0
+    invertedHoldSeconds: 0.4
+  - delayBeforeSeconds: 0.3
+    invertedHoldSeconds: 0.2
+  - delayBeforeSeconds: 0.1
+    invertedHoldSeconds: 0.1
 --- !u!1 &519758461
 GameObject:
   m_ObjectHideFlags: 0

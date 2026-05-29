@@ -1,12 +1,21 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace GlitchInTheSystem.Interruptions
 {
+    [Serializable]
+    public struct DesktopBackgroundFlickerStep
+    {
+        [Tooltip("Wait on the normal wallpaper before this inverted pulse.")]
+        public float delayBeforeSeconds;
+        [Tooltip("How long the inverted wallpaper stays visible.")]
+        public float invertedHoldSeconds;
+    }
+
     /// <summary>
-    /// Swaps the fake desktop wallpaper during the interruption intro (spinner flicker, then inverted lock).
-    /// Lives on <c>DesktopBackground</c> — separate from the gray <c>InterruptionOverlay</c>.
+    /// Pulses the inverted desktop wallpaper during the loading spinner, then locks it for the overlay.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Image))]
@@ -15,10 +24,15 @@ namespace GlitchInTheSystem.Interruptions
         [SerializeField] private Image desktopImage;
         [SerializeField] private Sprite normalBackground;
         [SerializeField] private Sprite invertedBackground;
-        [Tooltip("How fast the wallpaper alternates during the loading spinner.")]
-        [SerializeField] private float swapIntervalSeconds = 0.35f;
 
-        private Coroutine _swapRoutine;
+        [Header("Inverted pulses (then interruption overlay)")]
+        [SerializeField] private DesktopBackgroundFlickerStep[] flickerSteps =
+        {
+            new() { delayBeforeSeconds = 0f, invertedHoldSeconds = 0.4f },
+            new() { delayBeforeSeconds = 0.3f, invertedHoldSeconds = 0.2f },
+            new() { delayBeforeSeconds = 0.1f, invertedHoldSeconds = 0.1f },
+        };
+
         private Sprite _runtimeNormal;
 
         private void Awake()
@@ -36,39 +50,64 @@ namespace GlitchInTheSystem.Interruptions
 
             if (normalBackground == null && desktopImage != null)
                 normalBackground = desktopImage.sprite;
+
+            if (flickerSteps == null || flickerSteps.Length == 0)
+            {
+                flickerSteps = new[]
+                {
+                    new DesktopBackgroundFlickerStep { delayBeforeSeconds = 0f, invertedHoldSeconds = 0.4f },
+                    new DesktopBackgroundFlickerStep { delayBeforeSeconds = 0.3f, invertedHoldSeconds = 0.2f },
+                    new DesktopBackgroundFlickerStep { delayBeforeSeconds = 0.1f, invertedHoldSeconds = 0.1f },
+                };
+            }
         }
 
-        public void BeginSpinnerFlicker()
+        /// <summary>Runs each configured pulse, ends on inverted, then the overlay can appear.</summary>
+        public IEnumerator PlaySpinnerFlickerSequence()
         {
             if (desktopImage == null || normalBackground == null || invertedBackground == null)
-                return;
+                yield break;
 
-            StopSpinnerFlicker();
-            _swapRoutine = StartCoroutine(SpinnerFlickerRoutine());
+            if (flickerSteps == null || flickerSteps.Length == 0)
+                yield break;
+
+            desktopImage.sprite = normalBackground;
+
+            int lastIndex = flickerSteps.Length - 1;
+            for (int i = 0; i < flickerSteps.Length; i++)
+            {
+                DesktopBackgroundFlickerStep step = flickerSteps[i];
+
+                if (step.delayBeforeSeconds > 0f)
+                {
+                    desktopImage.sprite = normalBackground;
+                    yield return new WaitForSecondsRealtime(step.delayBeforeSeconds);
+                }
+
+                desktopImage.sprite = invertedBackground;
+
+                if (step.invertedHoldSeconds > 0f)
+                    yield return new WaitForSecondsRealtime(step.invertedHoldSeconds);
+
+                if (i < lastIndex)
+                    desktopImage.sprite = normalBackground;
+            }
+
+            desktopImage.sprite = invertedBackground;
         }
 
         public void StopSpinnerFlicker()
         {
-            if (_swapRoutine != null)
-            {
-                StopCoroutine(_swapRoutine);
-                _swapRoutine = null;
-            }
         }
 
-        /// <summary>Stop flicker and keep the creepy wallpaper for the rest of the interruption.</summary>
         public void LockInvertedBackground()
         {
-            StopSpinnerFlicker();
-
             if (desktopImage != null && invertedBackground != null)
                 desktopImage.sprite = invertedBackground;
         }
 
         public void RestoreNormalBackground()
         {
-            StopSpinnerFlicker();
-
             if (desktopImage == null)
                 return;
 
@@ -88,19 +127,6 @@ namespace GlitchInTheSystem.Interruptions
             {
                 _runtimeNormal = desktopImage.sprite;
                 normalBackground = _runtimeNormal;
-            }
-        }
-
-        private IEnumerator SpinnerFlickerRoutine()
-        {
-            float interval = Mathf.Max(0.08f, swapIntervalSeconds);
-            bool showInverted = false;
-
-            while (true)
-            {
-                desktopImage.sprite = showInverted ? invertedBackground : normalBackground;
-                showInverted = !showInverted;
-                yield return new WaitForSecondsRealtime(interval);
             }
         }
     }
