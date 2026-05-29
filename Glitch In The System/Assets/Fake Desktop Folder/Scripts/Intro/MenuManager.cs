@@ -64,8 +64,6 @@ namespace GlitchInTheSystem.Intro
         [SerializeField] private string authenticatingLabel = "Authenticating";
         [SerializeField] private float authenticationSeconds = 1.4f;
         [SerializeField] private float loadingDotStepSeconds = 0.25f;
-        [SerializeField] private float sceneFadeOutSeconds = 0.35f;
-
         [Header("Button Polish")]
         [SerializeField] private float hoverScaleMultiplier = 1.05f;
         [SerializeField] private float clickScaleMultiplier = 0.94f;

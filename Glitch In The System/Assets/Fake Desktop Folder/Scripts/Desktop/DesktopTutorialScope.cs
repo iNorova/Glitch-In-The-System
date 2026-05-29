@@ -41,7 +41,7 @@ public static class DesktopTutorialScope
 
     private static void SetLauncherInteractable(string buttonName, bool interactable)
     {
-        foreach (var b in Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsInactive.Include))
+        foreach (var b in Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (b == null || !b.gameObject.scene.IsValid()) continue;
             if (b.name == buttonName)
@@ -51,7 +51,7 @@ public static class DesktopTutorialScope
 
     private static GameObject FindSceneObjectByName(string objectName)
     {
-        foreach (var transform in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+        foreach (var transform in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (transform == null || !transform.gameObject.scene.IsValid()) continue;
             if (transform.name == objectName)
