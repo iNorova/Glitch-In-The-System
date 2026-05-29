@@ -58,6 +58,8 @@ namespace GlitchInTheSystem.Interruptions
         [Header("Not responding intro")]
         [Tooltip("How long the loading icon shows after intro audio (seconds).")]
         [SerializeField] private Vector2 loadingSpinnerDurationSeconds = new(2f, 3f);
+        [Tooltip("Desktop wallpaper flicker during spinner, then inverted until interruption ends.")]
+        [SerializeField] private InterruptionDesktopBackground desktopBackground;
 
         [Header("Feedback")]
         [SerializeField] private float invalidClickBlinkDuration = 0.12f;
@@ -148,6 +150,7 @@ namespace GlitchInTheSystem.Interruptions
         {
             MigrateLegacyBgmFields();
             EnsureAudioSources();
+            EnsureDesktopBackground();
         }
 
         private void MigrateLegacyBgmFields()
@@ -441,6 +444,7 @@ namespace GlitchInTheSystem.Interruptions
 
             yield return PlayMinigameIntroRoutine();
             yield return PlayLoadingSpinnerRoutine();
+            LockDesktopInvertedBackground();
             ShowInterruptionOverlay();
 
             for (int i = 0; i < popupCount; i++)
@@ -602,6 +606,7 @@ namespace GlitchInTheSystem.Interruptions
                 interruptionOverlayRoot.SetActive(false);
 
             SetLoadingSpinnerVisible(false);
+            RestoreDesktopBackground();
 
             minigameManager?.HideCaptcha();
             _captchaMusicActive = false;
@@ -670,11 +675,32 @@ namespace GlitchInTheSystem.Interruptions
                 SetLoadingSpinnerVisible(true);
             }
 
+            desktopBackground?.BeginSpinnerFlicker();
+
             if (duration > 0f)
                 yield return new WaitForSecondsRealtime(duration);
 
+            desktopBackground?.StopSpinnerFlicker();
             SetLoadingSpinnerVisible(false);
         }
+
+        private void EnsureDesktopBackground()
+        {
+            if (desktopBackground != null)
+                return;
+
+            var bgObject = GameObject.Find("DesktopBackground");
+            if (bgObject == null)
+                return;
+
+            desktopBackground = bgObject.GetComponent<InterruptionDesktopBackground>();
+            if (desktopBackground == null)
+                desktopBackground = bgObject.AddComponent<InterruptionDesktopBackground>();
+        }
+
+        private void LockDesktopInvertedBackground() => desktopBackground?.LockInvertedBackground();
+
+        private void RestoreDesktopBackground() => desktopBackground?.RestoreNormalBackground();
 
         private void ShowInterruptionOverlay()
         {
