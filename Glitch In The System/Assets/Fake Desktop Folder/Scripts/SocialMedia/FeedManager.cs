@@ -17,7 +17,7 @@ namespace GlitchInTheSystem.Social
             IReadOnlyList<PostData> source = includeRemoved ? db.Posts : db.GetFeedPosts();
 
             return source
-                .Where(p => p != null && p.isPublished && (includeRemoved || !p.isRemoved))
+                .Where(p => ShouldShowInFeed(p, includeRemoved))
                 .OrderByDescending(p => p.feedRank)
                 .ThenByDescending(GetPostSortKey)
                 .ToList();
@@ -66,5 +66,12 @@ namespace GlitchInTheSystem.Social
 
         /// <summary>Higher engagement surfaces first so viral outcomes feel immediate.</summary>
         private static int GetPostSortKey(PostData post) => post != null ? post.likes : 0;
+
+        private static bool ShouldShowInFeed(PostData post, bool includeRemoved)
+        {
+            if (post == null) return false;
+            if (includeRemoved) return post.isPublished || post.isRemoved;
+            return post.isPublished && !post.isRemoved;
+        }
     }
 }
