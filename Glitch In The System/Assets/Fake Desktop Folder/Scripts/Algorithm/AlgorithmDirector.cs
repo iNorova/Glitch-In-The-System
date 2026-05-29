@@ -161,6 +161,9 @@ namespace GlitchInTheSystem.Algorithm
                 algorithmApproved = phase == 2 ? _rng.NextDouble() > 0.5 : !playerApproved;
             }
 
+            if (algorithmApproved == playerApproved)
+                return (playerApproved, false, null);
+
             string reason = phase switch
             {
                 1 => "Policy enforcement override.",
