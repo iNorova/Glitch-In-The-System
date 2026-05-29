@@ -51,6 +51,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     private ScrollRect _feedScrollRectUsedForInit;
     private Coroutine _restoreScrollRoutine;
     private SocialMediaFeedPlatformChrome _platformChrome;
+    private GameDatabase _decisionEventDatabase;
 
 #if UNITY_EDITOR
     public bool IsEditModeFreeformLayout =>
@@ -80,6 +81,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (Application.isPlaying)
         {
             AlgorithmPostAlteredNotifier.PostAltered += OnFeedPostAltered;
+            SubscribeToDecisionEvents();
             SetRuntimeFeedHostVisible(forceRuntimeFeedHost);
             SetDesignTemplateVisible(false);
             RefreshFeed(force: true);
@@ -98,7 +100,10 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         }
 
         if (Application.isPlaying)
+        {
             AlgorithmPostAlteredNotifier.PostAltered -= OnFeedPostAltered;
+            UnsubscribeFromDecisionEvents();
+        }
     }
 
     private void OnFeedPostAltered(PostData post, bool rewrite)
@@ -107,6 +112,33 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
         if (TryUpdateFeedCardInPlace(post))
             StartCoroutine(FlashFeedCardGlitchAfterLayout(post, rewrite));
+    }
+
+    private void OnDatabaseDecisionRecorded(ModerationDecision decision)
+    {
+        if (!Application.isPlaying || !isActiveAndEnabled) return;
+        RefreshFeed(force: true);
+    }
+
+    private void SubscribeToDecisionEvents()
+    {
+        if (!useGameDatabase) return;
+
+        var db = GameDatabase.Instance;
+        if (_decisionEventDatabase == db) return;
+
+        UnsubscribeFromDecisionEvents();
+        if (db == null) return;
+
+        db.DecisionRecorded += OnDatabaseDecisionRecorded;
+        _decisionEventDatabase = db;
+    }
+
+    private void UnsubscribeFromDecisionEvents()
+    {
+        if (_decisionEventDatabase == null) return;
+        _decisionEventDatabase.DecisionRecorded -= OnDatabaseDecisionRecorded;
+        _decisionEventDatabase = null;
     }
 
     private bool TryUpdateFeedCardInPlace(PostData post)
@@ -458,6 +490,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             if (feedStatsText != null) feedStatsText.text = $"Filler feed  |  Posts: {filler.Count}";
             return;
         }
+
+        SubscribeToDecisionEvents();
 
         if (autoInitializeSessionIfEmpty && GameDatabase.Instance.Posts.Count == 0)
             GameDatabase.Instance.InitializeSession();

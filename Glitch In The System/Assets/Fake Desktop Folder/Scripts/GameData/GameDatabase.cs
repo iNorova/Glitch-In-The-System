@@ -154,7 +154,6 @@ namespace GlitchInTheSystem.GameData
                 timestamp = Time.time
             };
             _decisions.Add(decision);
-            DecisionRecorded?.Invoke(decision);
 
             var post = _posts.FirstOrDefault(p => p.id == postId);
             if (post != null)
@@ -175,6 +174,9 @@ namespace GlitchInTheSystem.GameData
 
             if (config != null)
                 DayPacing.PersistDay2ViralOutcome(config.currentDay, postId, finalApproved);
+
+            // Notify after post/feed state is committed, but still before WorkDashboard advances the queue.
+            DecisionRecorded?.Invoke(decision);
         }
 
         public PostData GetPostById(string id) => string.IsNullOrEmpty(id) ? null : _posts.FirstOrDefault(p => p.id == id);
