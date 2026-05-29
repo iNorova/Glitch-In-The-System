@@ -12,19 +12,20 @@ namespace GlitchInTheSystem.GameData
     /// </summary>
     public static class ModerationContentPools
     {
-        public readonly struct ModerationEntry
+        [Serializable]
+        public struct ModerationEntry
         {
-            public readonly string Text;
-            public readonly string ReportReason;
-            public readonly string ImageDescription;
-            public readonly PostPresentationFormat Format;
-            public readonly PostCategory Category;
-            public readonly int Severity;
-            public readonly string[] ApproveComments;
-            public readonly string[] DeclineComments;
-            public readonly ReporterTone ReporterTone;
-            public readonly ReportCredibility ReportCredibility;
-            public readonly PostVoice PostVoice;
+            public string Text;
+            public string ReportReason;
+            public string ImageDescription;
+            public PostPresentationFormat Format;
+            public PostCategory Category;
+            public int Severity;
+            public string[] ApproveComments;
+            public string[] DeclineComments;
+            public ReporterTone ReporterTone;
+            public ReportCredibility ReportCredibility;
+            public PostVoice PostVoice;
 
             public ModerationEntry(
                 string text,
