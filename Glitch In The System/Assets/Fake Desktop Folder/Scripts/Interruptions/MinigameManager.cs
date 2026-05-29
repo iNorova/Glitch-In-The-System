@@ -11,6 +11,16 @@ namespace GlitchInTheSystem.Interruptions
 
         public void Configure(CaptchaMinigame captcha) => captchaMinigame = captcha;
 
+        public void HideCaptcha()
+        {
+            IsCompleted = false;
+            if (captchaMinigame == null) return;
+
+            captchaMinigame.gameObject.SetActive(false);
+            if (captchaMinigame.transform.parent != null)
+                captchaMinigame.transform.parent.gameObject.SetActive(false);
+        }
+
         public void StartCaptcha(Action onSuccess, Action onFailure)
         {
             IsCompleted = false;

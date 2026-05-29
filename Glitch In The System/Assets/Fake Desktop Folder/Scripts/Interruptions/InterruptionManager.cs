@@ -29,6 +29,10 @@ namespace GlitchInTheSystem.Interruptions
         [SerializeField] private float popupMinSeparation = 320f;
         [Tooltip("Fallback size if container layout is not ready yet.")]
         [SerializeField] private Vector2 popupAreaFallbackSize = new(1920f, 1080f);
+        [Tooltip("Delay between each error popup appearing.")]
+        [SerializeField] private float popupStaggerSeconds = 0.55f;
+        [Tooltip("Pause after the last error popup before the captcha window appears.")]
+        [SerializeField] private float captchaRevealDelaySeconds = 0.4f;
 
         [Header("UI")]
         [SerializeField] private GameObject interruptionOverlayRoot;
@@ -57,6 +61,11 @@ namespace GlitchInTheSystem.Interruptions
         private float _nextTriggerTime;
         private Color _overlayBaseColor;
         private readonly List<Vector2> _spawnedPopupPositions = new();
+        private Coroutine _sequenceRoutine;
+        private float _spawnMinX;
+        private float _spawnMaxX;
+        private float _spawnMinY;
+        private float _spawnMaxY;
 
         /// <summary>Called by <see cref="InterruptionSceneBootstrap"/> when systems are created at runtime.</summary>
         public void Configure(
@@ -147,7 +156,40 @@ namespace GlitchInTheSystem.Interruptions
             if (interruptionOverlayRoot != null)
                 interruptionOverlayRoot.SetActive(true);
 
-            SpawnPopups();
+            minigameManager?.HideCaptcha();
+
+            if (_sequenceRoutine != null)
+                StopCoroutine(_sequenceRoutine);
+
+            _sequenceRoutine = StartCoroutine(InterruptionSequenceRoutine());
+        }
+
+        private IEnumerator InterruptionSequenceRoutine()
+        {
+            if (popupPrefab == null || popupContainer == null)
+            {
+                Debug.LogWarning("[InterruptionManager] Popup prefab or container not assigned.");
+                _remainingPopups = 0;
+                yield break;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(popupContainer);
+            GetPopupSpawnBounds(out _spawnMinX, out _spawnMaxX, out _spawnMinY, out _spawnMaxY);
+            _spawnedPopupPositions.Clear();
+            _remainingPopups = 0;
+
+            for (int i = 0; i < popupCount; i++)
+            {
+                SpawnSinglePopup(i);
+                _remainingPopups++;
+
+                if (i < popupCount - 1 && popupStaggerSeconds > 0f)
+                    yield return new WaitForSecondsRealtime(popupStaggerSeconds);
+            }
+
+            if (captchaRevealDelaySeconds > 0f)
+                yield return new WaitForSecondsRealtime(captchaRevealDelaySeconds);
 
             if (minigameManager != null)
             {
@@ -160,30 +202,15 @@ namespace GlitchInTheSystem.Interruptions
                     },
                     onFailure: () => PlayClip(captchaFailureClip));
             }
+
+            _sequenceRoutine = null;
         }
 
-        private void SpawnPopups()
+        private void SpawnSinglePopup(int index)
         {
-            if (popupPrefab == null || popupContainer == null)
-            {
-                Debug.LogWarning("[InterruptionManager] Popup prefab or container not assigned.");
-                _remainingPopups = 0;
-                return;
-            }
-
-            Canvas.ForceUpdateCanvases();
-            LayoutRebuilder.ForceRebuildLayoutImmediate(popupContainer);
-
-            GetPopupSpawnBounds(out float minX, out float maxX, out float minY, out float maxY);
-            _spawnedPopupPositions.Clear();
-
-            _remainingPopups = popupCount;
-            for (int i = 0; i < popupCount; i++)
-            {
-                ErrorPopup popup = Instantiate(popupPrefab, popupContainer);
-                popup.Initialize(this);
-                PlacePopupRandom((RectTransform)popup.transform, i, popupCount, minX, maxX, minY, maxY);
-            }
+            ErrorPopup popup = Instantiate(popupPrefab, popupContainer);
+            popup.Initialize(this);
+            PlacePopupRandom((RectTransform)popup.transform, index, popupCount, _spawnMinX, _spawnMaxX, _spawnMinY, _spawnMaxY);
         }
 
         private void GetPopupSpawnBounds(out float minX, out float maxX, out float minY, out float maxY)
@@ -298,8 +325,16 @@ namespace GlitchInTheSystem.Interruptions
             if (minigameManager == null || !minigameManager.IsCompleted) return;
             if (_remainingPopups > 0) return;
 
+            if (_sequenceRoutine != null)
+            {
+                StopCoroutine(_sequenceRoutine);
+                _sequenceRoutine = null;
+            }
+
             if (interruptionOverlayRoot != null)
                 interruptionOverlayRoot.SetActive(false);
+
+            minigameManager?.HideCaptcha();
 
             _interruptionActive = false;
             workDashboard?.SetModerationLocked(false);
