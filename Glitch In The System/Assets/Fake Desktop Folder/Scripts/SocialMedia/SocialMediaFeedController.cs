@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using GlitchInTheSystem.Algorithm;
 using GlitchInTheSystem.GameData;
+using GlitchInTheSystem.Interruptions;
 using GlitchInTheSystem.Social;
 using GlitchInTheSystem.UI;
 
@@ -84,6 +85,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             RefreshFeed(force: true);
             StartCoroutine(RefreshNextFrame());
             _nextRefreshAt = Time.unscaledTime + Mathf.Max(0.2f, autoRefreshSeconds);
+            NotifyInterruptionEligibleAppOpened();
         }
     }
 
@@ -1111,6 +1113,12 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         foreach (var p in posts)
             OrganicEngagementUtility.ApplyToPost(p, rng, p.category);
         return posts;
+    }
+
+    private static void NotifyInterruptionEligibleAppOpened()
+    {
+        var manager = FindFirstObjectByType<InterruptionManager>();
+        manager?.OnEligibleAppOpened();
     }
 
     private void EnsureWindowFocusHandler()

@@ -88,6 +88,7 @@ namespace GlitchInTheSystem.Interruptions
             Transform minigameRoot)
         {
             var workDashboard = FindFirstObjectByType<WorkDashboardController>();
+            var socialFeed = FindFirstObjectByType<SocialMediaFeedController>();
             var blockerImage = blocker.GetComponent<Image>();
 
             CaptchaMinigame captcha = null;
@@ -108,6 +109,7 @@ namespace GlitchInTheSystem.Interruptions
                 (RectTransform)popupContainer,
                 minigameManager,
                 workDashboard,
+                socialFeed,
                 blockerImage);
         }
 

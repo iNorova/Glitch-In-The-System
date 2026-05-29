@@ -27,7 +27,7 @@ namespace GlitchInTheSystem.Interruptions
         [SerializeField] private int minimumDayToStart = 2;
         [SerializeField] private int interruptionsPerDay = 3;
         [SerializeField] private Vector2 randomTriggerRangeSeconds = new(35f, 90f);
-        [Tooltip("If true, random interruptions only run while the Work Dashboard window is open.")]
+        [Tooltip("If true, random interruptions only run while the Content Moderator or Social Feed window is open.")]
         [SerializeField] private bool requireWorkDashboardOpen = true;
         [Tooltip("First auto-trigger wait after day 2+ begins or work opens (seconds).")]
         [SerializeField] private float firstAutoTriggerDelaySeconds = 20f;
@@ -53,6 +53,7 @@ namespace GlitchInTheSystem.Interruptions
         [SerializeField] private GameObject interruptionLoadingRoot;
         [SerializeField] private MinigameManager minigameManager;
         [SerializeField] private WorkDashboardController workDashboard;
+        [SerializeField] private SocialMediaFeedController socialFeed;
         [SerializeField] private Image overlayBlinkImage;
 
         [Header("Not responding intro")]
@@ -105,7 +106,7 @@ namespace GlitchInTheSystem.Interruptions
 
         private int _interruptionsTriggeredToday;
         private int _trackedNarrativeDay = -1;
-        private bool _workDashboardWasOpen;
+        private bool _eligibleAppWasOpen;
         private int _remainingPopups;
         private bool _interruptionActive;
         private float _nextTriggerTime;
@@ -131,12 +132,14 @@ namespace GlitchInTheSystem.Interruptions
             RectTransform container,
             MinigameManager minigame,
             WorkDashboardController dashboard,
+            SocialMediaFeedController feed,
             Image blinkImage)
         {
             interruptionOverlayRoot = overlayRoot;
             popupContainer = container;
             minigameManager = minigame;
             workDashboard = dashboard;
+            socialFeed = feed;
             overlayBlinkImage = blinkImage;
 
             MigrateLegacyBgmFields();
@@ -151,6 +154,9 @@ namespace GlitchInTheSystem.Interruptions
             MigrateLegacyBgmFields();
             EnsureAudioSources();
             EnsureDesktopBackground();
+
+            if (socialFeed == null)
+                socialFeed = FindFirstObjectByType<SocialMediaFeedController>();
         }
 
         private void MigrateLegacyBgmFields()
@@ -317,17 +323,17 @@ namespace GlitchInTheSystem.Interruptions
             if (day < minimumDayToStart)
                 return;
 
-            bool workOpen = IsWorkDashboardOpen();
-            if (requireWorkDashboardOpen && !workOpen)
+            bool eligibleOpen = IsInterruptionEligibleOpen();
+            if (requireWorkDashboardOpen && !eligibleOpen)
             {
-                _workDashboardWasOpen = false;
+                _eligibleAppWasOpen = false;
                 return;
             }
 
-            if (!_workDashboardWasOpen && workOpen)
+            if (!_eligibleAppWasOpen && eligibleOpen)
                 ScheduleNextTrigger(useFirstDayDelay: true);
 
-            _workDashboardWasOpen = workOpen;
+            _eligibleAppWasOpen = eligibleOpen;
 
             if (_interruptionsTriggeredToday >= interruptionsPerDay)
                 return;
@@ -342,18 +348,21 @@ namespace GlitchInTheSystem.Interruptions
             SyncNarrativeDay(GetNarrativeDay(), forceReschedule: true);
         }
 
-        /// <summary>Called when the work dashboard opens so day 2+ timers can start.</summary>
-        public void OnWorkDashboardOpened()
+        /// <summary>Called when the content moderator or social feed opens so day 2+ timers can start.</summary>
+        public void OnEligibleAppOpened()
         {
             if (GetNarrativeDay() < minimumDayToStart)
                 return;
 
-            if (!IsWorkDashboardOpen())
+            if (!IsInterruptionEligibleOpen())
                 return;
 
             ScheduleNextTrigger(useFirstDayDelay: true);
-            _workDashboardWasOpen = true;
+            _eligibleAppWasOpen = true;
         }
+
+        /// <summary>Called when the work dashboard opens so day 2+ timers can start.</summary>
+        public void OnWorkDashboardOpened() => OnEligibleAppOpened();
 
         private static int GetNarrativeDay()
         {
@@ -366,12 +375,23 @@ namespace GlitchInTheSystem.Interruptions
             return 1;
         }
 
+        private bool IsInterruptionEligibleOpen() =>
+            IsWorkDashboardOpen() || IsSocialFeedOpen();
+
         private bool IsWorkDashboardOpen()
         {
             if (workDashboard == null)
                 return true;
 
             return workDashboard.isActiveAndEnabled && workDashboard.gameObject.activeInHierarchy;
+        }
+
+        private bool IsSocialFeedOpen()
+        {
+            if (socialFeed == null)
+                return false;
+
+            return socialFeed.isActiveAndEnabled && socialFeed.gameObject.activeInHierarchy;
         }
 
         private void SyncNarrativeDay(int day, bool forceReschedule = false)
@@ -382,7 +402,7 @@ namespace GlitchInTheSystem.Interruptions
             _trackedNarrativeDay = day;
             _interruptionsTriggeredToday = 0;
 
-            if (day >= minimumDayToStart && (!requireWorkDashboardOpen || IsWorkDashboardOpen()))
+            if (day >= minimumDayToStart && (!requireWorkDashboardOpen || IsInterruptionEligibleOpen()))
                 ScheduleNextTrigger(useFirstDayDelay: true);
         }
 

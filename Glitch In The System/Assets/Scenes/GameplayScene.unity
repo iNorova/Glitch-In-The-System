@@ -16219,6 +16219,7 @@ MonoBehaviour:
   interruptionLoadingRoot: {fileID: 1756867436}
   minigameManager: {fileID: 2900001003}
   workDashboard: {fileID: 2058542991}
+  socialFeed: {fileID: 788364009}
   overlayBlinkImage: {fileID: 575723279}
   loadingSpinnerDurationSeconds: {x: 2, y: 3}
   desktopBackground: {fileID: 497619818}
