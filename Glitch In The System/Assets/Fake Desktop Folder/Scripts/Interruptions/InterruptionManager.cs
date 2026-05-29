@@ -56,6 +56,11 @@ namespace GlitchInTheSystem.Interruptions
         [SerializeField] private SocialMediaFeedController socialFeed;
         [SerializeField] private Image overlayBlinkImage;
 
+        [Header("Critical error screen glitch")]
+        [SerializeField] private Vector2 popupGlitchIntervalSeconds = new(0.18f, 0.45f);
+        [SerializeField] private float popupGlitchJitterPixels = 10f;
+        [SerializeField] private float popupGlitchPulseSeconds = 0.09f;
+
         [Header("Not responding intro")]
         [Tooltip("How long the loading icon shows after intro audio (seconds).")]
         [SerializeField] private Vector2 loadingSpinnerDurationSeconds = new(2f, 3f);
@@ -119,12 +124,15 @@ namespace GlitchInTheSystem.Interruptions
         private float _spawnMaxY;
         private Coroutine _musicFadeRoutine;
         private Coroutine _blinkRoutine;
+        private Coroutine _popupGlitchRoutine;
         private bool _captchaMusicActive;
         private AudioSource _bgmSourceA;
         private AudioSource _bgmSourceB;
         private const string MinigameBgmRootName = "MinigameBgmAudio";
         private const string BgmLayerAName = "BgmLayerA";
         private const string BgmLayerBName = "BgmLayerB";
+        private RectTransform _overlayRect;
+        private Vector2 _overlayBasePos;
 
         /// <summary>Called by <see cref="InterruptionSceneBootstrap"/> when systems are created at runtime.</summary>
         public void Configure(
@@ -142,6 +150,11 @@ namespace GlitchInTheSystem.Interruptions
             socialFeed = feed;
             overlayBlinkImage = blinkImage;
 
+            _overlayRect = interruptionOverlayRoot != null
+                ? interruptionOverlayRoot.GetComponent<RectTransform>()
+                : null;
+            CacheOverlayBasePosition();
+
             MigrateLegacyBgmFields();
             EnsureAudioSources();
 
@@ -157,6 +170,24 @@ namespace GlitchInTheSystem.Interruptions
 
             if (socialFeed == null)
                 socialFeed = FindFirstObjectByType<SocialMediaFeedController>();
+
+            if (_overlayRect == null && interruptionOverlayRoot != null)
+            {
+                _overlayRect = interruptionOverlayRoot.GetComponent<RectTransform>();
+                CacheOverlayBasePosition();
+            }
+        }
+
+        private void CacheOverlayBasePosition()
+        {
+            if (_overlayRect != null)
+                _overlayBasePos = _overlayRect.anchoredPosition;
+        }
+
+        private void RestoreOverlayPosition()
+        {
+            if (_overlayRect != null)
+                _overlayRect.anchoredPosition = _overlayBasePos;
         }
 
         private void MigrateLegacyBgmFields()
@@ -622,6 +653,14 @@ namespace GlitchInTheSystem.Interruptions
                 _sequenceRoutine = null;
             }
 
+            if (_popupGlitchRoutine != null)
+            {
+                StopCoroutine(_popupGlitchRoutine);
+                _popupGlitchRoutine = null;
+            }
+
+            RestoreOverlayPosition();
+
             if (interruptionOverlayRoot != null)
                 interruptionOverlayRoot.SetActive(false);
 
@@ -724,8 +763,58 @@ namespace GlitchInTheSystem.Interruptions
 
         private void ShowInterruptionOverlay()
         {
-            if (interruptionOverlayRoot != null)
-                interruptionOverlayRoot.SetActive(true);
+            if (interruptionOverlayRoot == null)
+                return;
+
+            interruptionOverlayRoot.SetActive(true);
+
+            CacheOverlayBasePosition();
+
+            if (_popupGlitchRoutine != null)
+            {
+                StopCoroutine(_popupGlitchRoutine);
+                _popupGlitchRoutine = null;
+            }
+
+            _popupGlitchRoutine = StartCoroutine(PopupGlitchLoop());
+        }
+
+        private IEnumerator PopupGlitchLoop()
+        {
+            while (_interruptionActive)
+            {
+                float wait = UnityEngine.Random.Range(popupGlitchIntervalSeconds.x, popupGlitchIntervalSeconds.y);
+                yield return new WaitForSecondsRealtime(Mathf.Max(0.03f, wait));
+
+                if (!_interruptionActive)
+                    yield break;
+
+                yield return PopupGlitchPulse();
+            }
+        }
+
+        private IEnumerator PopupGlitchPulse()
+        {
+            if (_overlayRect == null)
+                yield break;
+
+            float duration = Mathf.Max(0.03f, popupGlitchPulseSeconds);
+            float jitter = Mathf.Max(0f, popupGlitchJitterPixels);
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = duration <= 0f ? 1f : Mathf.Clamp01(elapsed / duration);
+                float envelope = 1f - Mathf.Abs(2f * t - 1f);
+
+                Vector2 offset = UnityEngine.Random.insideUnitCircle * jitter * envelope;
+                _overlayRect.anchoredPosition = _overlayBasePos + offset;
+
+                yield return null;
+            }
+
+            RestoreOverlayPosition();
         }
 
         private void SetLoadingSpinnerVisible(bool visible)
