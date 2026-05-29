@@ -951,7 +951,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 200, y: 118}
+  m_AnchoredPosition: {x: 200, y: 123}
   m_SizeDelta: {x: 80, y: 40}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &85996106
@@ -1419,14 +1419,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.18, g: 0.2, b: 0.24, a: 0.98}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: -2724199849366455946, guid: 0d2df7da2467d4b509293789f300cfc3, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -13574,8 +13574,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4292473535
-  m_fontColor: {r: 0.75, g: 0.95, b: 0.85, a: 1}
+    rgba: 4278202879
+  m_fontColor: {r: 1, g: 0.19400969, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -16020,6 +16020,8 @@ MonoBehaviour:
   popupScreenPadding: 120
   popupMinSeparation: 100
   popupAreaFallbackSize: {x: 1920, y: 1080}
+  popupStaggerSeconds: 0.55
+  captchaRevealDelaySeconds: 0.4
   interruptionOverlayRoot: {fileID: 291987976}
   minigameManager: {fileID: 2900001003}
   workDashboard: {fileID: 2058542991}
