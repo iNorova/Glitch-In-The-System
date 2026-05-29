@@ -58,6 +58,22 @@ namespace GlitchInTheSystem.Social
             return string.Empty;
         }
 
+        public static string CommentAuthorLabel(CommentData comment, UserProfileData user = null)
+        {
+            string handle = comment != null ? comment.displayHandle : null;
+            if (string.IsNullOrWhiteSpace(handle))
+                handle = user != null ? user.username : null;
+            if (string.IsNullOrWhiteSpace(handle))
+                handle = comment != null ? comment.authorUserId : null;
+            if (string.IsNullOrWhiteSpace(handle))
+                handle = "user";
+
+            handle = SanitizeForTMP(handle.Trim());
+            if (string.IsNullOrWhiteSpace(handle))
+                handle = "user";
+            return handle.StartsWith("@") ? handle : $"@{handle}";
+        }
+
         public static string SanitizeForTMP(string value)
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
