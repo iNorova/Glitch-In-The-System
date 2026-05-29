@@ -81,7 +81,13 @@ namespace GlitchInTheSystem.GameData
 
             DayPacing.ResetSessionState();
             DayPacing.ApplySessionStartPlayerPrefs(config);
-            AlgorithmManager.Instance?.ResetSessionState();
+            if (AlgorithmManager.Instance != null)
+            {
+                if (config == null || config.currentDay <= 1)
+                    AlgorithmManager.Instance.ResetSessionState();
+                else
+                    AlgorithmManager.Instance.ResetDayState();
+            }
             DayPacing.ApplyProfile(config, AlgorithmDirector.Instance);
 
             int postsToGenerate = config != null ? config.postsPerDay : 10;
