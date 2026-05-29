@@ -21,8 +21,11 @@ public static class GameplayAudioBootstrap
             return;
 
         var go = new GameObject("GlobalClickAudio");
+        go.SetActive(false);
+
         var clickAudio = go.AddComponent<GlobalClickAudio>();
         clickAudio.Configure(clip, volume: 0.5f, surviveSceneLoads: false);
+        go.SetActive(true);
     }
 
     private static AudioClip LoadClip(string assetPath)
