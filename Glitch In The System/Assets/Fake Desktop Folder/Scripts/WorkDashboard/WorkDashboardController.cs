@@ -8,6 +8,7 @@ using GlitchInTheSystem.GameData;
 using GlitchInTheSystem.Algorithm;
 using GlitchInTheSystem.Social;
 using GlitchInTheSystem.UI;
+using GlitchInTheSystem.Interruptions;
 
 public sealed class WorkDashboardController : MonoBehaviour
 {
@@ -225,6 +226,7 @@ public sealed class WorkDashboardController : MonoBehaviour
                 UpdateTopBar();
                 AlgorithmNotification.Instance?.Show(AlgorithmVoice.SessionResumed(currentIndex, postsPerSession));
                 Next();
+                NotifyInterruptionWorkSessionStarted();
                 return;
             }
 
@@ -238,6 +240,7 @@ public sealed class WorkDashboardController : MonoBehaviour
                 UpdateTopBar();
                 AlgorithmNotification.Instance?.Show(AlgorithmVoice.QueueLoaded(postsPerSession, dayNumber));
                 Next();
+                NotifyInterruptionWorkSessionStarted();
                 return;
             }
 
@@ -257,6 +260,7 @@ public sealed class WorkDashboardController : MonoBehaviour
                 if (!EnsureReady()) return;
                 UpdateTopBar();
                 Render();
+                NotifyInterruptionWorkSessionStarted();
                 return;
             }
 
@@ -268,6 +272,8 @@ public sealed class WorkDashboardController : MonoBehaviour
         if (!EnsureReady()) return;
         UpdateTopBar();
         Next();
+
+        NotifyInterruptionWorkSessionStarted();
     }
 
     private void BeginDayShiftTransition(int completedDay, int nextDay)
@@ -425,6 +431,21 @@ public sealed class WorkDashboardController : MonoBehaviour
 
         AlgorithmNotification.Instance?.Show(AlgorithmVoice.QueueLoaded(postsPerSession, dayNumber));
         Next();
+
+        NotifyInterruptionWorkSessionStarted();
+        NotifyInterruptionDayAdvanced();
+    }
+
+    private static void NotifyInterruptionWorkSessionStarted()
+    {
+        var manager = FindFirstObjectByType<InterruptionManager>();
+        manager?.OnWorkDashboardOpened();
+    }
+
+    private static void NotifyInterruptionDayAdvanced()
+    {
+        var manager = FindFirstObjectByType<InterruptionManager>();
+        manager?.OnNarrativeDayAdvanced();
     }
 
     private void ApplyFontMultiplier()

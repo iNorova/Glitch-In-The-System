@@ -27,6 +27,10 @@ namespace GlitchInTheSystem.Interruptions
         [SerializeField] private int minimumDayToStart = 2;
         [SerializeField] private int interruptionsPerDay = 3;
         [SerializeField] private Vector2 randomTriggerRangeSeconds = new(35f, 90f);
+        [Tooltip("If true, random interruptions only run while the Work Dashboard window is open.")]
+        [SerializeField] private bool requireWorkDashboardOpen = true;
+        [Tooltip("First auto-trigger wait after day 2+ begins or work opens (seconds).")]
+        [SerializeField] private float firstAutoTriggerDelaySeconds = 20f;
 
         [Header("Popups")]
         [SerializeField] [Range(1, 8)] private int popupCount = 4;
@@ -98,6 +102,8 @@ namespace GlitchInTheSystem.Interruptions
         [SerializeField] private KeyCode debugTriggerKey = KeyCode.I;
 
         private int _interruptionsTriggeredToday;
+        private int _trackedNarrativeDay = -1;
+        private bool _workDashboardWasOpen;
         private int _remainingPopups;
         private bool _interruptionActive;
         private float _nextTriggerTime;
@@ -284,7 +290,7 @@ namespace GlitchInTheSystem.Interruptions
             if (overlayBlinkImage != null)
                 _overlayBaseColor = overlayBlinkImage.color;
 
-            ScheduleNextTrigger();
+            SyncNarrativeDay(GetNarrativeDay());
         }
 
         private void Update()
@@ -302,18 +308,87 @@ namespace GlitchInTheSystem.Interruptions
                 return;
             }
 
-            int day = GameManager.Instance != null ? GameManager.Instance.CurrentDay : 1;
-            if (day < minimumDayToStart) return;
-            if (_interruptionsTriggeredToday >= interruptionsPerDay) return;
+            int day = GetNarrativeDay();
+            SyncNarrativeDay(day);
+
+            if (day < minimumDayToStart)
+                return;
+
+            bool workOpen = IsWorkDashboardOpen();
+            if (requireWorkDashboardOpen && !workOpen)
+            {
+                _workDashboardWasOpen = false;
+                return;
+            }
+
+            if (!_workDashboardWasOpen && workOpen)
+                ScheduleNextTrigger(useFirstDayDelay: true);
+
+            _workDashboardWasOpen = workOpen;
+
+            if (_interruptionsTriggeredToday >= interruptionsPerDay)
+                return;
 
             if (Time.time >= _nextTriggerTime)
                 StartInterruption();
         }
 
-        private void ScheduleNextTrigger()
+        /// <summary>Called when the player finishes a day and the narrative day increments.</summary>
+        public void OnNarrativeDayAdvanced()
         {
-            float delay = Random.Range(randomTriggerRangeSeconds.x, randomTriggerRangeSeconds.y);
-            _nextTriggerTime = Time.time + delay;
+            SyncNarrativeDay(GetNarrativeDay(), forceReschedule: true);
+        }
+
+        /// <summary>Called when the work dashboard opens so day 2+ timers can start.</summary>
+        public void OnWorkDashboardOpened()
+        {
+            if (GetNarrativeDay() < minimumDayToStart)
+                return;
+
+            if (!IsWorkDashboardOpen())
+                return;
+
+            ScheduleNextTrigger(useFirstDayDelay: true);
+            _workDashboardWasOpen = true;
+        }
+
+        private static int GetNarrativeDay()
+        {
+            if (GameDatabase.Instance?.Config != null)
+                return GameDatabase.Instance.Config.currentDay;
+
+            if (GameManager.Instance != null)
+                return GameManager.Instance.CurrentDay;
+
+            return 1;
+        }
+
+        private bool IsWorkDashboardOpen()
+        {
+            if (workDashboard == null)
+                return true;
+
+            return workDashboard.isActiveAndEnabled && workDashboard.gameObject.activeInHierarchy;
+        }
+
+        private void SyncNarrativeDay(int day, bool forceReschedule = false)
+        {
+            if (!forceReschedule && _trackedNarrativeDay == day)
+                return;
+
+            _trackedNarrativeDay = day;
+            _interruptionsTriggeredToday = 0;
+
+            if (day >= minimumDayToStart && (!requireWorkDashboardOpen || IsWorkDashboardOpen()))
+                ScheduleNextTrigger(useFirstDayDelay: true);
+        }
+
+        private void ScheduleNextTrigger(bool useFirstDayDelay = false)
+        {
+            float delay = useFirstDayDelay
+                ? firstAutoTriggerDelaySeconds
+                : Random.Range(randomTriggerRangeSeconds.x, randomTriggerRangeSeconds.y);
+            _nextTriggerTime = Time.time + Mathf.Max(0f, delay);
         }
 
         public void StartInterruption()
