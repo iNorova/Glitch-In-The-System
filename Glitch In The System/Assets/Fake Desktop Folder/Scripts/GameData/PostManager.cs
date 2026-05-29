@@ -134,7 +134,7 @@ namespace GlitchInTheSystem.GameData
                     postId = post.id,
                     authorUserId = authorId,
                     text = flavored,
-                    timestampLabel = $"{UnityEngine.Random.Range(1, 45)}m",
+                    timestampLabel = $"{seeded.Next(1, 45)}m",
                     likes = Mathf.Max(0, DeriveCommentLikeCount(post.likes, i, playerChoseApprove)),
                     isHidden = false
                 });
