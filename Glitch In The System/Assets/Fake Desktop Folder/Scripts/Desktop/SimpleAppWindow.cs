@@ -46,7 +46,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
             return;
         }
 
-        DesktopWindowLayer.PrepareWindowRoot(windowRoot);
+        DesktopWindowLayer.PrepareWindowRoot(windowRoot, activate: true);
         BringToFront();
 
         if (_animator != null)
@@ -68,7 +68,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
 
         if (_animator != null && windowRoot.activeSelf && !_animator.IsLogicallyOpen)
         {
-            DesktopWindowLayer.PrepareWindowRoot(windowRoot);
+            DesktopWindowLayer.PrepareWindowRoot(windowRoot, activate: true);
             BringToFront();
             _animator.AnimateOpen();
             return;
@@ -119,7 +119,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
             _animator = windowRoot.GetComponent<WindowAnimator>();
 
         DesktopHierarchy.EnsureActive(windowRoot);
-        DesktopWindowLayer.PrepareWindowRoot(windowRoot);
+        DesktopWindowLayer.PrepareWindowRoot(windowRoot, activate: true);
         BringToFront();
 
         if (_animator != null)

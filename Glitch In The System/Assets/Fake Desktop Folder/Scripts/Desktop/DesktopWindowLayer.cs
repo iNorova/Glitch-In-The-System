@@ -5,11 +5,14 @@ using UnityEngine;
 /// </summary>
 public static class DesktopWindowLayer
 {
-    public static void PrepareWindowRoot(GameObject windowRoot)
+    public static void PrepareWindowRoot(GameObject windowRoot, bool activate = false)
     {
         if (windowRoot == null) return;
 
-        var canvas = windowRoot.GetComponentInParent<Canvas>();
+        if (activate)
+            DesktopHierarchy.EnsureActive(windowRoot);
+
+        var canvas = windowRoot.GetComponentInParent<Canvas>(true);
         if (canvas == null) return;
 
         Transform shell = windowRoot.transform;
@@ -28,7 +31,9 @@ public static class DesktopWindowLayer
             return;
         }
 
-        DesktopHierarchy.EnsureActive(shell.gameObject);
+        if (activate)
+            DesktopHierarchy.EnsureActive(shell.gameObject);
+
         StretchFullscreen(shellRect);
         DesktopUiStackOrder.BringAppShellForward(shell);
     }
