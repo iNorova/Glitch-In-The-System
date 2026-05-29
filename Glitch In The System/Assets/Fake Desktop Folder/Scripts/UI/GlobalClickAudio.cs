@@ -28,6 +28,17 @@ public sealed class GlobalClickAudio : MonoBehaviour
     private static GlobalClickAudio _instance;
     private AudioSource _audioSource;
 
+    public static bool HasInstance => _instance != null;
+
+    /// <summary>Runtime setup when GameplayScene is played without LoginScene.</summary>
+    public void Configure(AudioClip clip, float volume = 0.5f, bool surviveSceneLoads = false)
+    {
+        clickClip = clip;
+        clickVolume = volume;
+        persistAcrossScenes = surviveSceneLoads;
+        InitializeAudioSource();
+    }
+
     private void Awake()
     {
         if (_instance != null && _instance != this)
@@ -37,7 +48,14 @@ public sealed class GlobalClickAudio : MonoBehaviour
         }
 
         _instance = this;
+        InitializeAudioSource();
 
+        if (persistAcrossScenes)
+            DontDestroyOnLoad(gameObject);
+    }
+
+    private void InitializeAudioSource()
+    {
         _audioSource = GetComponent<AudioSource>();
         if (_audioSource == null)
             _audioSource = gameObject.AddComponent<AudioSource>();
@@ -45,9 +63,7 @@ public sealed class GlobalClickAudio : MonoBehaviour
         _audioSource.playOnAwake = false;
         _audioSource.loop = false;
         _audioSource.spatialBlend = 0f;
-
-        if (persistAcrossScenes)
-            DontDestroyOnLoad(gameObject);
+        _audioSource.volume = 1f;
     }
 
     private void Update()
