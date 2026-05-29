@@ -51,10 +51,10 @@ namespace GlitchInTheSystem.Social
         public static string BuildStateLabel(PostData post, UserProfileData user)
         {
             if (post == null) return string.Empty;
-            if (post.wasRewrittenByAlgorithm) return "Rewritten by algorithm";
+            if (post.isRemoved) return "Removed from public feed";
             if (user != null && user.isShadowBanned) return "Author visibility limited";
             if (post.isShadowBanned) return "Post visibility limited";
-            if (post.isRemoved) return "Removed from public feed";
+            if (post.wasRewrittenByAlgorithm) return "Rewritten by algorithm";
             return string.Empty;
         }
 
