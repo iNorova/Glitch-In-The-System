@@ -413,13 +413,19 @@ namespace GlitchInTheSystem.Interruptions
         private bool IsWorkDashboardOpen()
         {
             if (workDashboard == null)
-                return true;
+                workDashboard = FindAnyObjectByType<WorkDashboardController>(FindObjectsInactive.Include);
+
+            if (workDashboard == null)
+                return false;
 
             return workDashboard.isActiveAndEnabled && workDashboard.gameObject.activeInHierarchy;
         }
 
         private bool IsSocialFeedOpen()
         {
+            if (socialFeed == null)
+                socialFeed = FindAnyObjectByType<SocialMediaFeedController>(FindObjectsInactive.Include);
+
             if (socialFeed == null)
                 return false;
 
