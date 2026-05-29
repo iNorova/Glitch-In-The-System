@@ -96,7 +96,8 @@ namespace GlitchInTheSystem.Social
                     if (commentCount > 0 && i < post.commentPreview.Count)
                     {
                         var c = post.commentPreview[i];
-                        line.text = $"@{c.authorUserId}: {SocialMediaFeedPresentation.SanitizeForTMP(c.text)}";
+                        string commenter = SocialMediaFeedPresentation.CommentAuthorLabel(c);
+                        line.text = $"{commenter}: {SocialMediaFeedPresentation.SanitizeForTMP(c.text)}";
                     }
                     else if (isEditorPreview)
                         line.text = line.text.Length > 0 ? line.text : "@user: Sample comment for layout.";

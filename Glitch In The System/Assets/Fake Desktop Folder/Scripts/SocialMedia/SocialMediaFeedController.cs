@@ -775,10 +775,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             for (int i = 0; i < show; i++)
             {
                 var c = post.commentPreview[i];
-                string commenter = c.authorUserId;
                 var commentUser = GameDatabase.Instance != null ? GameDatabase.Instance.GetUser(c.authorUserId) : null;
-                if (commentUser != null && !string.IsNullOrEmpty(commentUser.username))
-                    commenter = $"@{commentUser.username}";
+                string commenter = SocialMediaFeedPresentation.CommentAuthorLabel(c, commentUser);
 
                 CreateTMP(
                     $"Comment_{i}",
