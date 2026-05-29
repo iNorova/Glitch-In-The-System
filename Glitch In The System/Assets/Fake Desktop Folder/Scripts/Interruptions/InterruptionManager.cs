@@ -619,54 +619,14 @@ namespace GlitchInTheSystem.Interruptions
             if (desktop == null)
                 return;
 
-            Transform existing = desktop.Find("InterruptionLoading");
+            Transform existing = desktop.Find(InterruptionLoadingSpinnerFactory.RootName);
             if (existing != null)
             {
                 interruptionLoadingRoot = existing.gameObject;
                 return;
             }
 
-            var root = new GameObject(
-                "InterruptionLoading",
-                typeof(RectTransform),
-                typeof(CanvasRenderer),
-                typeof(Image));
-            root.transform.SetParent(desktop, false);
-            root.transform.SetAsLastSibling();
-
-            var rootImage = root.GetComponent<Image>();
-            rootImage.color = new Color(0f, 0f, 0f, 0f);
-            rootImage.raycastTarget = true;
-
-            var rootRt = root.GetComponent<RectTransform>();
-            rootRt.anchorMin = Vector2.zero;
-            rootRt.anchorMax = Vector2.one;
-            rootRt.pivot = new Vector2(0.5f, 0.5f);
-            rootRt.anchoredPosition = Vector2.zero;
-            rootRt.sizeDelta = Vector2.zero;
-            rootRt.localScale = Vector3.one;
-
-            var iconGo = new GameObject(
-                "LoadingIcon",
-                typeof(RectTransform),
-                typeof(CanvasRenderer),
-                typeof(Image),
-                typeof(InterruptionLoadingSpinner));
-            iconGo.transform.SetParent(root.transform, false);
-
-            var iconRt = iconGo.GetComponent<RectTransform>();
-            iconRt.anchorMin = new Vector2(0.5f, 0.5f);
-            iconRt.anchorMax = new Vector2(0.5f, 0.5f);
-            iconRt.pivot = new Vector2(0.5f, 0.5f);
-            iconRt.anchoredPosition = Vector2.zero;
-            iconRt.sizeDelta = new Vector2(52f, 52f);
-
-            var image = iconGo.GetComponent<Image>();
-            image.color = new Color(0.35f, 0.35f, 0.38f, 1f);
-            image.raycastTarget = false;
-
-            root.SetActive(false);
-            interruptionLoadingRoot = root;
+            interruptionLoadingRoot = InterruptionLoadingSpinnerFactory.Create(desktop);
         }
 
         /// <summary>One-shot that never uses the BGM AudioSource (avoids voice / clip conflicts).</summary>

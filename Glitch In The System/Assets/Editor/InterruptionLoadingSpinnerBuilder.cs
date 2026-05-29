@@ -2,7 +2,6 @@
 using GlitchInTheSystem.Interruptions;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
 /// Creates the centered loading spinner shown before the gray "not responding" overlay.
@@ -28,46 +27,13 @@ public static class InterruptionLoadingSpinnerBuilder
         int group = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Build Interruption Loading Spinner");
 
-        Transform existing = fakeDesktop.transform.Find("InterruptionLoading");
+        Transform existing = fakeDesktop.transform.Find(InterruptionLoadingSpinnerFactory.RootName);
         if (existing != null)
             Undo.DestroyObjectImmediate(existing.gameObject);
 
-        var root = new GameObject(
-            "InterruptionLoading",
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image));
+        var root = InterruptionLoadingSpinnerFactory.Create(fakeDesktop.transform);
         Undo.RegisterCreatedObjectUndo(root, "Create InterruptionLoading");
-        root.transform.SetParent(fakeDesktop.transform, false);
-        root.transform.SetAsLastSibling();
-        Stretch(root.GetComponent<RectTransform>());
-
-        var rootImage = root.GetComponent<Image>();
-        rootImage.color = new Color(0f, 0f, 0f, 0f);
-        rootImage.raycastTarget = true;
-
-        var iconGo = new GameObject(
-            "LoadingIcon",
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image),
-            typeof(InterruptionLoadingSpinner));
-        Undo.RegisterCreatedObjectUndo(iconGo, "Create LoadingIcon");
-        iconGo.transform.SetParent(root.transform, false);
-
-        var iconRt = iconGo.GetComponent<RectTransform>();
-        iconRt.anchorMin = new Vector2(0.5f, 0.5f);
-        iconRt.anchorMax = new Vector2(0.5f, 0.5f);
-        iconRt.pivot = new Vector2(0.5f, 0.5f);
-        iconRt.anchoredPosition = Vector2.zero;
-        iconRt.sizeDelta = new Vector2(52f, 52f);
-
-        var image = iconGo.GetComponent<Image>();
-        image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-        image.color = new Color(0.35f, 0.35f, 0.38f, 1f);
-        image.raycastTarget = false;
-
-        root.SetActive(false);
+        SetUiLayerRecursive(root);
 
         var manager = Object.FindFirstObjectByType<InterruptionManager>();
         if (manager != null)
@@ -82,18 +48,14 @@ public static class InterruptionLoadingSpinnerBuilder
         Selection.activeGameObject = root;
 
         Debug.Log(
-            "[InterruptionLoadingSpinnerBuilder] Created InterruptionLoading under FakeDesktop. " +
-            "It shows after intro audio, then the gray overlay enables.");
+            "[InterruptionLoadingSpinnerBuilder] Created InterruptionLoading with ring spinner under FakeDesktop.");
     }
 
-    private static void Stretch(RectTransform rt)
+    private static void SetUiLayerRecursive(GameObject go)
     {
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = Vector2.zero;
-        rt.sizeDelta = Vector2.zero;
-        rt.localScale = Vector3.one;
+        go.layer = 5;
+        foreach (Transform child in go.transform)
+            SetUiLayerRecursive(child.gameObject);
     }
 }
 #endif

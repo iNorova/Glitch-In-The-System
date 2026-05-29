@@ -8,7 +8,7 @@ namespace GlitchInTheSystem.Interruptions
     public sealed class InterruptionLoadingSpinner : MonoBehaviour
     {
         [SerializeField] private RectTransform spinnerTransform;
-        [SerializeField] private float degreesPerSecond = 200f;
+        [SerializeField] private float degreesPerSecond = 360f;
 
         private void Awake()
         {
