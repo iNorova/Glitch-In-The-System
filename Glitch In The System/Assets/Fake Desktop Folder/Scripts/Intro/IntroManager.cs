@@ -289,6 +289,8 @@ namespace GlitchInTheSystem.Intro
 
         private IEnumerator RunTutorialPosts()
         {
+            DesktopTutorialScope.Begin();
+
             _tutorialProceedClicked = false;
             DestroyTutorialProceedHud();
 
@@ -560,6 +562,8 @@ namespace GlitchInTheSystem.Intro
 
         private void CompleteIntro()
         {
+            DesktopTutorialScope.End();
+
             if (loadGameplaySceneAfterIntro && !string.IsNullOrWhiteSpace(gameplaySceneName))
             {
                 SceneManager.LoadScene(gameplaySceneName);
@@ -812,6 +816,8 @@ namespace GlitchInTheSystem.Intro
         private void EnsureWorkDashboardWindowOpen()
         {
             if (workDashboard == null) return;
+
+            DesktopTutorialScope.EnforceContentModeratorOnly();
 
             var app = workDashboard.GetComponent<DesktopAppWindow>();
             if (app != null)

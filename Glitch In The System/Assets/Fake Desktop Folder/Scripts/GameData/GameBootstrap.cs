@@ -57,6 +57,8 @@ namespace GlitchInTheSystem.GameData
 
             if (AlgorithmGlitchHighlight.Instance == null)
                 CreateSystemObject("AlgorithmGlitchHighlight").AddComponent<AlgorithmGlitchHighlight>();
+
+            DesktopLauncherHub.EnsureInitialized();
         }
 
         public AlgorithmTrustSettings AlgorithmTrustSettings => algorithmTrustSettings;

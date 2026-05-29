@@ -15,5 +15,9 @@ public sealed class DesktopCanvasPlayModeFix : MonoBehaviour
         if (canvas == null) return;
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.worldCamera = null;
+
+        var rt = transform as RectTransform;
+        if (rt != null && rt.localScale == Vector3.zero)
+            rt.localScale = Vector3.one;
     }
 }

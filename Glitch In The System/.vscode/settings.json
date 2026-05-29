@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "Glitch In The System.sln"
+    "dotnet.defaultSolution": "Glitch In The System.slnx"
 }

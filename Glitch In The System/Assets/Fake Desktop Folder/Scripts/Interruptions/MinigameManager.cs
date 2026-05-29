@@ -42,6 +42,7 @@ namespace GlitchInTheSystem.Interruptions
                 captchaMinigame.transform.parent.gameObject.SetActive(true);
 
             captchaMinigame.gameObject.SetActive(true);
+            DesktopUiStackOrder.RaiseInterruptionStack();
             captchaMinigame.StartCaptcha(onSuccess, onFailure);
         }
 

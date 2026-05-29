@@ -672,6 +672,7 @@ namespace GlitchInTheSystem.Interruptions
             StopMinigameBackground();
 
             _interruptionActive = false;
+            DesktopUiStackOrder.SetInterruptionBlocking(false);
             workDashboard?.SetModerationLocked(false);
             ScheduleNextTrigger();
         }
@@ -727,7 +728,7 @@ namespace GlitchInTheSystem.Interruptions
 
             if (interruptionLoadingRoot != null)
             {
-                interruptionLoadingRoot.transform.SetAsLastSibling();
+                DesktopUiStackOrder.RaiseInterruptionStack();
                 SetLoadingSpinnerVisible(true);
             }
 
@@ -767,6 +768,7 @@ namespace GlitchInTheSystem.Interruptions
                 return;
 
             interruptionOverlayRoot.SetActive(true);
+            DesktopUiStackOrder.SetInterruptionBlocking(true);
 
             CacheOverlayBasePosition();
 
