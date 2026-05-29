@@ -19,8 +19,7 @@ public sealed class DesktopAppLauncher : MonoBehaviour
     {
         _button = GetComponent<Button>();
         DisableChildRaycastBlockers();
-        _button.onClick.RemoveAllListeners();
-        _button.onClick.AddListener(Launch);
+        DesktopUIButtonWiring.SetSingleClickListener(_button, Launch);
     }
 
     private void Launch()

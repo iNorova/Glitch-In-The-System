@@ -174,16 +174,13 @@ public sealed class StartMenuController : MonoBehaviour
     {
         if (startMenuPanel == null || startButton == null) return;
 
-        // Remove legacy scene binding that forces SetActive(true) and fights the toggle.
-        startButton.onClick.RemoveAllListeners();
-
         _toggleProxy ??= startButton.gameObject.GetComponent<StartButtonToggleProxy>();
         if (_toggleProxy == null) _toggleProxy = startButton.gameObject.AddComponent<StartButtonToggleProxy>();
         _toggleProxy.SetTarget(startMenuPanel);
         _toggleProxy.SetController(this);
 
-        startButton.onClick.AddListener(_toggleProxy.ApplyToggleFromPreClickState);
-
+        // Replace legacy scene bindings that force SetActive(true) and fight the toggle.
+        DesktopUIButtonWiring.SetSingleClickListener(startButton, _toggleProxy.ApplyToggleFromPreClickState);
     }
 
     private void LaunchWorkDashboardApp()
