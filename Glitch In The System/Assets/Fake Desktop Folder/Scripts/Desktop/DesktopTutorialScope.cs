@@ -27,25 +27,37 @@ public static class DesktopTutorialScope
         if (social != null)
             social.Close();
 
-        var socialShell = GameObject.Find("Social Media");
+        var socialShell = FindSceneObjectByName("Social Media");
         if (socialShell != null)
             socialShell.SetActive(false);
     }
 
     private static void RestoreSocialShell()
     {
-        var socialShell = GameObject.Find("Social Media");
+        var socialShell = FindSceneObjectByName("Social Media");
         if (socialShell != null)
             socialShell.SetActive(true);
     }
 
     private static void SetLauncherInteractable(string buttonName, bool interactable)
     {
-        foreach (var b in Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (var b in Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsInactive.Include))
         {
             if (b == null || !b.gameObject.scene.IsValid()) continue;
             if (b.name == buttonName)
                 b.interactable = interactable;
         }
+    }
+
+    private static GameObject FindSceneObjectByName(string objectName)
+    {
+        foreach (var transform in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+        {
+            if (transform == null || !transform.gameObject.scene.IsValid()) continue;
+            if (transform.name == objectName)
+                return transform.gameObject;
+        }
+
+        return null;
     }
 }
