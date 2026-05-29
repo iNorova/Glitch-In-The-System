@@ -1177,11 +1177,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
     private static string BuildStateLabel(PostData post, UserProfileData user)
     {
-        if (post.wasRewrittenByAlgorithm) return "Rewritten by algorithm";
-        if (user != null && user.isShadowBanned) return "Author visibility limited";
-        if (post.isShadowBanned) return "Post visibility limited";
-        if (post.isRemoved) return "Removed from public feed";
-        return string.Empty;
+        return SocialMediaFeedPresentation.BuildStateLabel(post, user);
     }
 
     private static string CategoryLabel(PostCategory category) => SocialMediaFeedPresentation.CategoryLabel(category);
