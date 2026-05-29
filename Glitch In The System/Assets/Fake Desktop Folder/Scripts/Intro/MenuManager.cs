@@ -73,6 +73,7 @@ namespace GlitchInTheSystem.Intro
 
         [Header("Audio")]
         [SerializeField] private AudioSource audioSource;
+        [SerializeField] [Range(0f, 1f)] private float sfxVolume = 1f;
         [SerializeField] private AudioClip buttonHoverClip;
         [SerializeField] private AudioClip buttonClickClip;
         [SerializeField] private AudioClip loginProceedClip;
@@ -89,6 +90,8 @@ namespace GlitchInTheSystem.Intro
 
         private void Awake()
         {
+            EnsureAudioSource();
+
             if (loginButton != null) _loginBaseScale = loginButton.transform.localScale;
             if (shutdownButton != null) _shutdownBaseScale = shutdownButton.transform.localScale;
 
@@ -384,10 +387,26 @@ namespace GlitchInTheSystem.Intro
             if (shutdownButton != null) shutdownButton.interactable = interactable;
         }
 
+        private void EnsureAudioSource()
+        {
+            if (audioSource == null)
+                audioSource = GetComponent<AudioSource>();
+
+            if (audioSource == null)
+                audioSource = gameObject.AddComponent<AudioSource>();
+
+            audioSource.playOnAwake = false;
+            audioSource.loop = false;
+            audioSource.spatialBlend = 0f;
+            audioSource.volume = 1f;
+        }
+
         private void PlayClip(AudioClip clip)
         {
-            if (clip == null || audioSource == null) return;
-            audioSource.PlayOneShot(clip);
+            if (clip == null) return;
+
+            EnsureAudioSource();
+            audioSource.PlayOneShot(clip, sfxVolume);
         }
 
         private IEnumerator ClickPulse(Transform target, Vector3 baseScale)

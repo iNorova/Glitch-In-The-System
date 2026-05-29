@@ -49,6 +49,9 @@ namespace GlitchInTheSystem.Interruptions
 
             if (submitButton != null)
                 submitButton.onClick.AddListener(OnSubmitClicked);
+
+            if (inputField != null)
+                inputField.onSubmit.AddListener(_ => OnSubmitClicked());
         }
 
         private void OnDisable()
@@ -117,6 +120,7 @@ namespace GlitchInTheSystem.Interruptions
             GenerateCaptcha();
             if (inputField != null)
             {
+                inputField.lineType = TMP_InputField.LineType.SingleLine;
                 inputField.text = string.Empty;
                 inputField.Select();
                 inputField.ActivateInputField();
@@ -174,6 +178,7 @@ namespace GlitchInTheSystem.Interruptions
             }
             else
             {
+                PlayOutsideClickBlink();
                 HandleFailure();
             }
         }
@@ -184,6 +189,7 @@ namespace GlitchInTheSystem.Interruptions
             GenerateCaptcha();
             if (inputField != null)
             {
+                inputField.lineType = TMP_InputField.LineType.SingleLine;
                 inputField.text = string.Empty;
                 inputField.Select();
                 inputField.ActivateInputField();
