@@ -360,19 +360,47 @@ namespace GlitchInTheSystem.GameData
             }
 
             var library = config != null ? config.moderationContentLibrary : null;
+            var libraryEntries = GetValidLibraryEntries(library);
+            var proceduralEntries = BuildProceduralEntryPool(libraryEntries);
 
             for (int i = sampleCount; i < count; i++)
             {
                 var author = _users[_rng.Next(_users.Count)];
-                PostData post;
+                int proceduralIndex = i - sampleCount;
 
-                // Always pull captions from the hand-authored pool (blend chance only affects sample vs pool ordering).
-                var entries = ModerationContentPools.AllQueueEntries;
-                var entry = entries[_rng.Next(entries.Count)];
-                post = ModerationContentPools.BuildPostFromEntry(entry, author, $"p_{i}", _rng);
+                // Seed configured library entries once, then keep filling from the merged authored pool.
+                var entry = proceduralIndex < libraryEntries.Count
+                    ? libraryEntries[proceduralIndex]
+                    : proceduralEntries[_rng.Next(proceduralEntries.Count)];
+
+                PostData post = ModerationContentPools.BuildPostFromEntry(entry, author, $"p_{i}", _rng);
                 _posts.Add(post);
                 _moderationQueue.Add(post);
             }
+        }
+
+        private static List<ModerationContentPools.ModerationEntry> GetValidLibraryEntries(ModerationContentLibrary library)
+        {
+            var result = new List<ModerationContentPools.ModerationEntry>();
+            if (library?.extraQueueEntries == null) return result;
+
+            foreach (var entry in library.extraQueueEntries)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.Text))
+                    result.Add(entry);
+            }
+
+            return result;
+        }
+
+        private static List<ModerationContentPools.ModerationEntry> BuildProceduralEntryPool(
+            IReadOnlyList<ModerationContentPools.ModerationEntry> libraryEntries)
+        {
+            var entries = new List<ModerationContentPools.ModerationEntry>();
+            if (libraryEntries != null)
+                entries.AddRange(libraryEntries);
+            entries.AddRange(ModerationContentPools.AllQueueEntries);
+            return entries;
         }
 
         private void GenerateUserPool(int userCount)
