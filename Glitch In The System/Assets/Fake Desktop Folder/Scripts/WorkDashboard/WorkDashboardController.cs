@@ -93,6 +93,7 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private readonly System.Random rng = new();
     private WorkDashboardAlgorithmUI _algorithmUi;
+    private readonly Dictionary<TMP_Text, float> _baseFontSizes = new();
 
     /// <summary>Set by <see cref="GlitchInTheSystem.Intro.IntroManager"/> so opening the inactive window doesn't run <see cref="StartSession"/> before the tutorial queue exists.</summary>
     private bool _suppressStartSessionOnce;
@@ -450,10 +451,18 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private void ApplyFontMultiplier()
     {
-        if (fontSizeMultiplier <= 0.01f || Math.Abs(fontSizeMultiplier - 1f) < 0.001f) return;
+        float multiplier = fontSizeMultiplier <= 0.01f ? 1f : fontSizeMultiplier;
 
         foreach (var tmp in GetComponentsInChildren<TextMeshProUGUI>(true))
-            tmp.fontSize = Mathf.RoundToInt(tmp.fontSize * fontSizeMultiplier);
+        {
+            if (!_baseFontSizes.TryGetValue(tmp, out float baseSize) || baseSize <= 0f)
+            {
+                baseSize = tmp.fontSize;
+                _baseFontSizes[tmp] = baseSize;
+            }
+
+            tmp.fontSize = Mathf.RoundToInt(baseSize * multiplier);
+        }
     }
 
     private void Decide(bool playerApproved, string playerReason)
@@ -1174,4 +1183,3 @@ public sealed class WorkDashboardController : MonoBehaviour
         public bool HasAttachedComments;
     }
 }
-
