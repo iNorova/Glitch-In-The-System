@@ -455,6 +455,21 @@ namespace GlitchInTheSystem.Interruptions
             if (popupPrefab == null)
             {
                 Debug.LogError("[InterruptionManager] Popup Prefab missing. Put CriticalErrorUi prefab in Assets/Error/.");
+                ScheduleNextTrigger();
+                return;
+            }
+
+            if (popupContainer == null)
+            {
+                Debug.LogWarning("[InterruptionManager] Popup container missing. Cannot start interruption.", this);
+                ScheduleNextTrigger();
+                return;
+            }
+
+            if (minigameManager == null)
+            {
+                Debug.LogWarning("[InterruptionManager] Minigame manager missing. Cannot start interruption.", this);
+                ScheduleNextTrigger();
                 return;
             }
 
@@ -483,7 +498,14 @@ namespace GlitchInTheSystem.Interruptions
             if (popupPrefab == null || popupContainer == null)
             {
                 Debug.LogWarning("[InterruptionManager] Popup prefab or container not assigned.");
-                _remainingPopups = 0;
+                CancelActiveInterruption(scheduleRetry: true);
+                yield break;
+            }
+
+            if (minigameManager == null)
+            {
+                Debug.LogWarning("[InterruptionManager] Minigame manager not assigned.");
+                CancelActiveInterruption(scheduleRetry: true);
                 yield break;
             }
 
@@ -525,6 +547,35 @@ namespace GlitchInTheSystem.Interruptions
             }
 
             _sequenceRoutine = null;
+        }
+
+        private void CancelActiveInterruption(bool scheduleRetry)
+        {
+            _remainingPopups = 0;
+            _interruptionActive = false;
+            _captchaMusicActive = false;
+            _sequenceRoutine = null;
+
+            if (_popupGlitchRoutine != null)
+            {
+                StopCoroutine(_popupGlitchRoutine);
+                _popupGlitchRoutine = null;
+            }
+
+            RestoreOverlayPosition();
+
+            if (interruptionOverlayRoot != null)
+                interruptionOverlayRoot.SetActive(false);
+
+            SetLoadingSpinnerVisible(false);
+            RestoreDesktopBackground();
+            minigameManager?.HideCaptcha();
+            StopMinigameBackground();
+            DesktopUiStackOrder.SetInterruptionBlocking(false);
+            workDashboard?.SetModerationLocked(false);
+
+            if (scheduleRetry)
+                ScheduleNextTrigger();
         }
 
         private void SpawnSinglePopup(int index)
