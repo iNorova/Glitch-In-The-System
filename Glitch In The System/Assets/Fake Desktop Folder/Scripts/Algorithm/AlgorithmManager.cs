@@ -336,8 +336,10 @@ namespace GlitchInTheSystem.Algorithm
 
         private void ApplyDayEscalation(PostData post, int dayNumber)
         {
-            int day = Mathf.Clamp(dayNumber, 1, maxManipulationDay);
-            float scale = day / (float)maxManipulationDay;
+            int day = Mathf.Max(1, dayNumber);
+            int maxDay = Mathf.Max(1, maxManipulationDay);
+            int cappedDay = Mathf.Min(day, maxDay);
+            float scale = cappedDay / (float)maxDay;
 
             post.feedRank = Mathf.Min(100, post.feedRank + Mathf.RoundToInt(8f * scale + day * 0.5f));
 
