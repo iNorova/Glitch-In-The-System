@@ -151,6 +151,7 @@ public sealed class DesktopAppWindow : MonoBehaviour, IPointerDownHandler, IBegi
     {
         if (windowRoot == null) return;
 
+        bool canRaiseWindowRoot = true;
         var canvas = windowRoot.GetComponentInParent<Canvas>();
         if (canvas != null)
         {
@@ -158,8 +159,10 @@ public sealed class DesktopAppWindow : MonoBehaviour, IPointerDownHandler, IBegi
             while (shell.parent != null && shell.parent != canvas.transform)
                 shell = shell.parent;
             DesktopUiStackOrder.BringAppShellForward(shell);
+            canRaiseWindowRoot = shell != windowRoot.transform || !DesktopUiStackOrder.IsInterruptionBlocking;
         }
 
-        windowRoot.transform.SetAsLastSibling();
+        if (canRaiseWindowRoot)
+            windowRoot.transform.SetAsLastSibling();
     }
 }
