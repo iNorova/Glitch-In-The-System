@@ -19,11 +19,7 @@ namespace GlitchInTheSystem.Interruptions
         public void HideCaptcha()
         {
             IsCompleted = false;
-            if (captchaMinigame == null) return;
-
-            captchaMinigame.gameObject.SetActive(false);
-            if (captchaMinigame.transform.parent != null)
-                captchaMinigame.transform.parent.gameObject.SetActive(false);
+            SetCaptchaVisible(false);
         }
 
         public void StartCaptcha(Action onSuccess, Action onFailure)
@@ -49,8 +45,20 @@ namespace GlitchInTheSystem.Interruptions
         public void MarkCompleted()
         {
             IsCompleted = true;
-            if (captchaMinigame != null)
-                captchaMinigame.gameObject.SetActive(false);
+            SetCaptchaVisible(false);
+        }
+
+        private void SetCaptchaVisible(bool visible)
+        {
+            if (captchaMinigame == null) return;
+
+            if (visible && captchaMinigame.transform.parent != null)
+                captchaMinigame.transform.parent.gameObject.SetActive(true);
+
+            captchaMinigame.gameObject.SetActive(visible);
+
+            if (!visible && captchaMinigame.transform.parent != null)
+                captchaMinigame.transform.parent.gameObject.SetActive(false);
         }
     }
 }
