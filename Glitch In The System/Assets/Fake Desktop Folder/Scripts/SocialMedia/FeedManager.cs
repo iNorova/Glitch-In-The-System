@@ -17,7 +17,7 @@ namespace GlitchInTheSystem.Social
             IReadOnlyList<PostData> source = includeRemoved ? db.Posts : db.GetFeedPosts();
 
             return source
-                .Where(p => p != null && p.isPublished && !p.isRemoved)
+                .Where(p => p != null && p.isPublished && (includeRemoved || !p.isRemoved))
                 .OrderByDescending(p => p.feedRank)
                 .ThenByDescending(GetPostSortKey)
                 .ToList();
