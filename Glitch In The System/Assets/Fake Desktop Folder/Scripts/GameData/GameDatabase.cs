@@ -251,11 +251,23 @@ namespace GlitchInTheSystem.GameData
         public int GetOverrideCount() => _decisions.Count(d => d.wasOverriddenByAlgorithm);
 
         /// <summary>
-        /// Get all posts for the Social Media feed (excluding removed).
+        /// Get all posts for the Social Media feed (excluding removed or visibility-limited content).
         /// </summary>
         public IReadOnlyList<PostData> GetFeedPosts()
         {
-            return _posts.Where(p => p.isPublished && !p.isRemoved && !p.isShadowBanned).ToList();
+            return _posts
+                .Where(p => p != null
+                            && p.isPublished
+                            && !p.isRemoved
+                            && !p.isShadowBanned
+                            && !IsAuthorShadowBanned(p.authorUserId))
+                .ToList();
+        }
+
+        private bool IsAuthorShadowBanned(string userId)
+        {
+            return !string.IsNullOrEmpty(userId)
+                   && _users.Any(u => u != null && u.id == userId && u.isShadowBanned);
         }
 
         /// <summary>
