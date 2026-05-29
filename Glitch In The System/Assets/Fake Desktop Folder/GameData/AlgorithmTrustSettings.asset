@@ -21,4 +21,4 @@ MonoBehaviour:
   aggressiveProfile: {fileID: 0}
   hesitationSeconds: 12
   stressHighThreshold: 72
-  maxManipulationDay: 1
+  maxManipulationDay: 10
