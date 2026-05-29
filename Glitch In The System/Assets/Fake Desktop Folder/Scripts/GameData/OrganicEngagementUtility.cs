@@ -18,7 +18,7 @@ namespace GlitchInTheSystem.GameData
         private static readonly int[] HeatedLikes = { 2387, 3412, 5419, 7823, 8733, 11204, 15202, 28441, 42107 };
         private static readonly int[] ViralLikes =
         {
-            12400, 18933, 28441, 41207, 58912, 87331, 142880, 218441, 402119, 847293
+            12437, 18933, 28441, 41207, 58912, 87331, 142880, 218441, 402119, 847293
         };
 
         // Algorithm / bot campaigns — intentionally round (Step 1 rule).
