@@ -117,7 +117,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (card == null) return false;
 
         var user = GameDatabase.Instance.GetUser(post.authorUserId);
-        SocialMediaFeedCardBinder.Apply(card, post, user, expandComments: false);
+        SocialMediaFeedCardBinder.Apply(card, post, user, expandComments: false, GameDatabase.Instance.GetUser);
         RebuildFeedCardLayout(card as RectTransform);
         return true;
     }
@@ -516,7 +516,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (template != null)
         {
             for (int i = 0; i < posts.Count; i++)
-                CreateFeedCardFromTemplate(template, posts[i], getUser?.Invoke(posts[i].authorUserId));
+                CreateFeedCardFromTemplate(template, posts[i], getUser);
             return;
         }
 
@@ -524,7 +524,7 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             CreateFeedCard(post, getUser?.Invoke(post.authorUserId));
     }
 
-    private void CreateFeedCardFromTemplate(RectTransform template, PostData post, UserProfileData user)
+    private void CreateFeedCardFromTemplate(RectTransform template, PostData post, Func<string, UserProfileData> getUser)
     {
         var clone = Instantiate(template.gameObject, feedContent);
         clone.name = $"FeedCard_{post.id}";
@@ -540,7 +540,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (cardRt != null)
             PrepareClonedCardForFeedLayout(cardRt);
 
-        SocialMediaFeedCardBinder.Apply(clone.transform, post, user, expandComments: false);
+        var user = getUser?.Invoke(post.authorUserId);
+        SocialMediaFeedCardBinder.Apply(clone.transform, post, user, expandComments: false, getUser);
         SocialMediaFeedLayoutConstraints.PrepareRuntimeFeedCard(clone.transform as RectTransform);
         WireRuntimeCommentsToggle(clone.transform, post);
     }
