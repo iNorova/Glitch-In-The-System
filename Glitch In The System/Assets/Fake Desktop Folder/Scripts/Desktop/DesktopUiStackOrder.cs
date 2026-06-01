@@ -70,13 +70,13 @@ public static class DesktopUiStackOrder
     {
         int index = int.MaxValue;
 
-        if (_interruptionOverlay != null)
+        if (_interruptionOverlay != null && _interruptionOverlay.parent == _desktopRoot)
             index = Mathf.Min(index, _interruptionOverlay.GetSiblingIndex());
 
-        if (_interruptionLoading != null)
+        if (_interruptionLoading != null && _interruptionLoading.parent == _desktopRoot)
             index = Mathf.Min(index, _interruptionLoading.GetSiblingIndex());
 
-        if (_minigameRoot != null)
+        if (_minigameRoot != null && _minigameRoot.parent == _desktopRoot)
             index = Mathf.Min(index, _minigameRoot.GetSiblingIndex());
 
         return index == int.MaxValue ? -1 : index;
