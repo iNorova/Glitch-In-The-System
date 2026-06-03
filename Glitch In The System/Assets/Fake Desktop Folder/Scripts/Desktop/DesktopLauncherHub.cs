@@ -8,7 +8,8 @@ using TMPro;
 public static class DesktopLauncherHub
 {
     private static DesktopAppWindow _workDashboard;
-    private static SimpleAppWindow _socialMedia;
+    private static SimpleAppWindow  _socialMedia;
+    private static SimpleAppWindow  _paintApp;
 
     public static void EnsureInitialized()
     {
@@ -36,12 +37,24 @@ public static class DesktopLauncherHub
         _socialMedia?.OpenFromLauncher();
     }
 
+    public static void OpenPaintApp()
+    {
+        if (DesktopTutorialScope.IsContentModeratorOnly) return;
+
+        EnsureInitialized();
+        if (_paintApp == null)
+            _paintApp = DesktopAppLocator.Find<SimpleAppWindow>("Paint", "PaintApp");
+        _paintApp?.OpenFromLauncher();
+    }
+
     private static void CacheWindows()
     {
         if (_workDashboard == null)
             _workDashboard = DesktopAppLocator.Find<DesktopAppWindow>("ContentModerator", "WorkDashboard");
         if (_socialMedia == null)
             _socialMedia = DesktopAppLocator.Find<SimpleAppWindow>("SocialMedia", "SocialMediaApp");
+        if (_paintApp == null)
+            _paintApp = DesktopAppLocator.Find<SimpleAppWindow>("Paint", "PaintApp");
     }
 
     private static void EnsureDesktopCanvas()
@@ -63,7 +76,6 @@ public static class DesktopLauncherHub
 
     private static void WireButtons()
     {
-        // Desktop Icon: scene Inspector → DesktopAppWindow.OpenFromLauncher
         WireButton("WorkDashboardButton", () =>
         {
             CloseStartMenuIfOpen();
@@ -73,6 +85,11 @@ public static class DesktopLauncherHub
         {
             CloseStartMenuIfOpen();
             OpenSocialMedia();
+        });
+        WireButton("Paint Button", () =>
+        {
+            CloseStartMenuIfOpen();
+            OpenPaintApp();
         });
     }
 

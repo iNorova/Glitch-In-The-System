@@ -16,16 +16,24 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
 
     private void Awake()
     {
-        if (windowRoot == null) windowRoot = gameObject;
-
-        _animator    = windowRoot.GetComponent<WindowAnimator>();
-        _minimizable = windowRoot.GetComponent<MinimizableWindow>()
-                    ?? GetComponent<MinimizableWindow>();
+        EnsureInit();
 
         if (startClosed && windowRoot != null)
             windowRoot.SetActive(false);
 
         DesktopWindowLayer.PrepareWindowRoot(windowRoot);
+    }
+
+    /// <summary>
+    /// Lazy initialiser — safe to call on inactive GameObjects before Awake fires.
+    /// Idempotent: repeated calls are free.
+    /// </summary>
+    private void EnsureInit()
+    {
+        if (windowRoot == null) windowRoot = gameObject;
+        if (_animator    == null) _animator    = windowRoot.GetComponent<WindowAnimator>();
+        if (_minimizable == null) _minimizable = windowRoot.GetComponent<MinimizableWindow>()
+                                              ?? GetComponent<MinimizableWindow>();
     }
 
     private bool IsWindowFullyOpen()
@@ -38,7 +46,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
 
     public void OpenInstant()
     {
-        if (windowRoot == null) return;
+        EnsureInit();
 
         if (_minimizable != null && _minimizable.IsMinimized)
         {
@@ -58,7 +66,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
     public void Open()
     {
         if (DesktopTutorialScope.IsContentModeratorOnly) return;
-        if (windowRoot == null) return;
+        EnsureInit();
 
         if (_minimizable != null && _minimizable.IsMinimized)
         {
@@ -93,7 +101,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
     public void OpenIfClosed()
     {
         if (DesktopTutorialScope.IsContentModeratorOnly) return;
-        if (windowRoot == null) return;
+        EnsureInit();
 
         if (_minimizable != null && _minimizable.IsMinimized)
         {
@@ -115,8 +123,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
 
     private void OpenAnimated()
     {
-        if (_animator == null && windowRoot != null)
-            _animator = windowRoot.GetComponent<WindowAnimator>();
+        EnsureInit();
 
         DesktopHierarchy.EnsureActive(windowRoot);
         DesktopWindowLayer.PrepareWindowRoot(windowRoot, activate: true);
@@ -130,7 +137,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
 
     public void Close()
     {
-        if (windowRoot == null) return;
+        EnsureInit();
 
         if (_animator != null)
             _animator.AnimateClose();
@@ -140,7 +147,7 @@ public sealed class SimpleAppWindow : MonoBehaviour, IPointerDownHandler, IBegin
 
     public void Toggle()
     {
-        if (windowRoot == null) return;
+        EnsureInit();
         if (_minimizable != null && _minimizable.IsMinimized) { _minimizable.Restore(); return; }
         if (IsWindowFullyOpen()) Close();
         else OpenIfClosed();
