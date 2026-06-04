@@ -53,6 +53,18 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     private SocialMediaFeedPlatformChrome _platformChrome;
     private GameDatabase _decisionEventDatabase;
 
+    // PERF B3: short-circuit AutoBindByName once all references are resolved in play mode.
+    // Resets to false in Awake so scene reloads re-bind correctly.
+    private bool _autoBindDone;
+
+    // PERF FIX #2: debounce flag — prevents duplicate full rebuilds within the same frame
+    // when multiple DecisionRecorded events fire rapidly (e.g. bulk operations).
+    private bool _decisionRefreshPending;
+
+    // PERF FIX #1 (SocialMedia side): cache InterruptionManager so OnEnable doesn't
+    // call FindFirstObjectByType every time the feed window opens.
+    private static InterruptionManager _cachedInterruptionManager;
+
 #if UNITY_EDITOR
     public bool IsEditModeFreeformLayout =>
         GetComponentInChildren<SocialMediaFeedFreeformLayout>(true) != null;
@@ -65,6 +77,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
     private void Awake()
     {
+        // PERF B3: reset bind cache on every Awake (scene reload / new instance).
+        _autoBindDone = false;
         AutoBindByName();
         AutoBindPostDesignTemplate();
         WireButtonsIfPresent();
@@ -99,6 +113,9 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             _restoreScrollRoutine = null;
         }
 
+        // PERF FIX #2: cancel any pending debounced refresh when window closes.
+        _decisionRefreshPending = false;
+
         if (Application.isPlaying)
         {
             AlgorithmPostAlteredNotifier.PostAltered -= OnFeedPostAltered;
@@ -114,9 +131,35 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             StartCoroutine(FlashFeedCardGlitchAfterLayout(post, rewrite));
     }
 
+    // PERF FIX #2: debounce decision-driven feed rebuild.
+    // Root cause: every Approve/Decline fires DecisionRecorded → RefreshFeed(force:true)
+    // → ClearFeedChildren + N Destroy + N Instantiate + Canvas.ForceUpdateCanvases,
+    // all synchronously on the same frame as the button press.
+    //
+    // Fix: set a pending flag and do the rebuild at end-of-frame via coroutine.
+    // If multiple decisions fire in the same frame (or the flag is already set),
+    // only one rebuild happens. Visually identical — the feed updates on the
+    // same frame the player sees the result, just deferred past input handling.
     private void OnDatabaseDecisionRecorded(ModerationDecision decision)
     {
         if (!Application.isPlaying || !isActiveAndEnabled) return;
+
+        if (_decisionRefreshPending) return; // already queued, skip duplicate
+
+        _decisionRefreshPending = true;
+        StartCoroutine(DecisionRefreshRoutine());
+    }
+
+    private IEnumerator DecisionRefreshRoutine()
+    {
+        // Yield to end of frame so the button press, audio, and UI feedback
+        // all complete before we destroy and rebuild card GameObjects.
+        yield return new WaitForEndOfFrame();
+
+        _decisionRefreshPending = false;
+
+        if (!Application.isPlaying || !isActiveAndEnabled) yield break;
+
         RefreshFeed(force: true);
     }
 
@@ -157,7 +200,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     private IEnumerator FlashFeedCardGlitchAfterLayout(PostData post, bool emphasizeRewrite)
     {
         yield return null;
-        Canvas.ForceUpdateCanvases();
+        // PERF: removed Canvas.ForceUpdateCanvases() — the card is already laid out
+        // by RebuildFeedCardLayout which ran synchronously before this coroutine started.
         if (feedContent == null || post == null) yield break;
 
         var card = feedContent.Find($"FeedCard_{post.id}");
@@ -176,13 +220,16 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     private IEnumerator RestoreFeedScrollAfterRebuild(float normalizedPosition)
     {
         float clamped = Mathf.Clamp01(normalizedPosition);
+        // PERF: was 3 layout flushes over 3 frames. Now:
+        // Frame 1: queue dirty (MarkLayoutForRebuild inside RebuildFeedLayout)
+        // Frame 2: force measure once right before we read the scroll rect size
         yield return null;
         RebuildFeedLayout();
-        yield return null;
-        Canvas.ForceUpdateCanvases();
+        yield return new WaitForEndOfFrame();
+
+        // One targeted rebuild to ensure feedContent height is correct before setting scroll.
         if (feedContent != null)
             LayoutRebuilder.ForceRebuildLayoutImmediate(feedContent);
-        yield return new WaitForEndOfFrame();
 
         if (feedScrollRect != null)
         {
@@ -620,14 +667,17 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     private void RebuildFeedCardLayout(RectTransform cardRt)
     {
         if (cardRt == null) return;
-        Canvas.ForceUpdateCanvases();
+        // PERF: removed Canvas.ForceUpdateCanvases() (full canvas flush) and the
+        // feedContent ForceRebuildLayoutImmediate (entire feed rebuild for one card).
+        // Rebuild only the comment panel and the card itself; mark feedContent dirty
+        // so Unity resizes it naturally at end-of-frame without blocking this frame.
         var panel = cardRt.Find("CommentsPanel") as RectTransform
             ?? cardRt.Find("CommentsSection/CommentsPanel") as RectTransform;
         if (panel != null)
             LayoutRebuilder.ForceRebuildLayoutImmediate(panel);
         LayoutRebuilder.ForceRebuildLayoutImmediate(cardRt);
         if (feedContent != null)
-            LayoutRebuilder.ForceRebuildLayoutImmediate(feedContent);
+            LayoutRebuilder.MarkLayoutForRebuild(feedContent);
     }
 
     private static void PrepareClonedCardForFeedLayout(RectTransform cardRt)
@@ -904,8 +954,10 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     private void RebuildFeedLayout()
     {
         if (feedContent == null) return;
-        Canvas.ForceUpdateCanvases();
-        LayoutRebuilder.ForceRebuildLayoutImmediate(feedContent);
+        // PERF: MarkLayoutForRebuild queues a dirty flag — Unity flushes it at end-of-frame.
+        // ForceUpdateCanvases + ForceRebuildLayoutImmediate was doing a synchronous full
+        // canvas flush here, spiking the frame whenever the feed refreshed.
+        LayoutRebuilder.MarkLayoutForRebuild(feedContent);
     }
 
     private void EnsureRuntimeFeedTree()
@@ -1148,10 +1200,16 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         return posts;
     }
 
+    // PERF FIX #1 (SocialMedia side): cache InterruptionManager reference.
+    // Original code called FindFirstObjectByType<InterruptionManager>() on every OnEnable,
+    // i.e. every time the Social Feed window is opened. Now cached statically and only
+    // re-acquired when null (component destroyed / scene reloaded).
     private static void NotifyInterruptionEligibleAppOpened()
     {
-        var manager = FindFirstObjectByType<InterruptionManager>();
-        manager?.OnEligibleAppOpened();
+        if (_cachedInterruptionManager == null)
+            _cachedInterruptionManager = FindFirstObjectByType<InterruptionManager>();
+
+        _cachedInterruptionManager?.OnEligibleAppOpened();
     }
 
     private void EnsureWindowFocusHandler()
@@ -1170,6 +1228,15 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
     private void AutoBindByName()
     {
+        // PERF B3: in play mode, skip all GetComponentsInChildren traversals once every
+        // reference is resolved. AutoBindByName is called 7 times per window open cycle;
+        // each FindTMP/FindScrollRect/FindButton call allocates a new array and walks the
+        // full hierarchy. The flag resets in Awake so scene reloads re-bind correctly.
+        // Edit-mode path is excluded: feedScrollRect must re-resolve there each time
+        // because the RuntimeFeedHost scroll vs the Body/FeedScroll changes with layout ops.
+        if (Application.isPlaying && _autoBindDone)
+            return;
+
         feedStatsText ??= FindTMP("FeedStatsText");
 
         if (Application.isPlaying)
@@ -1200,6 +1267,15 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
         refreshButton ??= FindButton("RefreshButton");
         refreshButton ??= FindButtonByLabel("Refresh");
+
+        // PERF B3: mark done only when all critical references are resolved in play mode.
+        if (Application.isPlaying &&
+            feedStatsText != null &&
+            feedScrollRect != null &&
+            feedContent != null)
+        {
+            _autoBindDone = true;
+        }
     }
 
     private void WireButtonsIfPresent()

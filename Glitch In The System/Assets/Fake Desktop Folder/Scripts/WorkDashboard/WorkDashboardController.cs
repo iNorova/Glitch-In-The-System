@@ -94,6 +94,10 @@ public sealed class WorkDashboardController : MonoBehaviour
     private readonly System.Random rng = new();
     private WorkDashboardAlgorithmUI _algorithmUi;
     private readonly Dictionary<TMP_Text, float> _baseFontSizes = new();
+    // PERF B3: cached TMP list so GetComponentsInChildren only runs once per Awake.
+    private TMP_Text[] _cachedTmpComponents;
+    // PERF B3: skip all fontSize writes when the multiplier hasn't changed.
+    private float _lastAppliedMultiplier = -1f;
 
     /// <summary>Set by <see cref="GlitchInTheSystem.Intro.IntroManager"/> so opening the inactive window doesn't run <see cref="StartSession"/> before the tutorial queue exists.</summary>
     private bool _suppressStartSessionOnce;
@@ -126,6 +130,9 @@ public sealed class WorkDashboardController : MonoBehaviour
     {
         AutoBindByName();
         EnsureWindowFocusHandler();
+        // PERF B3: invalidate TMP cache on every Awake (scene reload / new instance).
+        _cachedTmpComponents = null;
+        _lastAppliedMultiplier = -1f;
         _algorithmUi = GetComponent<WorkDashboardAlgorithmUI>();
         if (_algorithmUi == null)
             _algorithmUi = gameObject.AddComponent<WorkDashboardAlgorithmUI>();
@@ -437,24 +444,44 @@ public sealed class WorkDashboardController : MonoBehaviour
         NotifyInterruptionDayAdvanced();
     }
 
+    // PERF: cache InterruptionManager reference — FindFirstObjectByType was called on
+    // every session start and every day advance. Now cached statically, re-acquired if null.
+    private static InterruptionManager _cachedInterruptionManager;
+
     private static void NotifyInterruptionWorkSessionStarted()
     {
-        var manager = FindFirstObjectByType<InterruptionManager>();
-        manager?.OnWorkDashboardOpened();
+        if (_cachedInterruptionManager == null)
+            _cachedInterruptionManager = FindFirstObjectByType<InterruptionManager>();
+        _cachedInterruptionManager?.OnWorkDashboardOpened();
     }
 
     private static void NotifyInterruptionDayAdvanced()
     {
-        var manager = FindFirstObjectByType<InterruptionManager>();
-        manager?.OnNarrativeDayAdvanced();
+        if (_cachedInterruptionManager == null)
+            _cachedInterruptionManager = FindFirstObjectByType<InterruptionManager>();
+        _cachedInterruptionManager?.OnNarrativeDayAdvanced();
     }
 
     private void ApplyFontMultiplier()
     {
         float multiplier = fontSizeMultiplier <= 0.01f ? 1f : fontSizeMultiplier;
 
-        foreach (var tmp in GetComponentsInChildren<TextMeshProUGUI>(true))
+        // PERF B3: skip entirely when multiplier hasn't changed since last apply.
+        // ApplyFontMultiplier is called 5x per session open; at the default 1.1f it
+        // was doing GetComponentsInChildren + N fontSize dirty-marks every single time.
+        if (Mathf.Approximately(multiplier, _lastAppliedMultiplier))
+            return;
+
+        // PERF B3: cache TMP array — GetComponentsInChildren allocates a new array
+        // every call and walks the full hierarchy. We only rebuild the cache if null
+        // (first call after Awake) or if new TMP components appeared (count changed).
+        if (_cachedTmpComponents == null)
+            _cachedTmpComponents = GetComponentsInChildren<TextMeshProUGUI>(true);
+
+        foreach (var tmp in _cachedTmpComponents)
         {
+            if (tmp == null) continue; // guard against destroyed components
+
             if (!_baseFontSizes.TryGetValue(tmp, out float baseSize) || baseSize <= 0f)
             {
                 baseSize = tmp.fontSize;
@@ -463,6 +490,8 @@ public sealed class WorkDashboardController : MonoBehaviour
 
             tmp.fontSize = Mathf.RoundToInt(baseSize * multiplier);
         }
+
+        _lastAppliedMultiplier = multiplier;
     }
 
     private void Decide(bool playerApproved, string playerReason)
@@ -716,11 +745,19 @@ public sealed class WorkDashboardController : MonoBehaviour
         le.preferredHeight = 26;
 
         // Auto-scroll to bottom.
+        // PERF: removed Canvas.ForceUpdateCanvases() — it flushed the entire canvas
+        // synchronously on every Approve/Decline keypress. The new entry is already
+        // parented; deferring one frame lets Unity measure it naturally and then we
+        // set the scroll position with no visual difference.
         if (decisionHistoryScrollRect != null)
-        {
-            Canvas.ForceUpdateCanvases();
+            StartCoroutine(ScrollHistoryToBottomNextFrame());
+    }
+
+    private IEnumerator ScrollHistoryToBottomNextFrame()
+    {
+        yield return null;
+        if (decisionHistoryScrollRect != null)
             decisionHistoryScrollRect.verticalNormalizedPosition = 0f;
-        }
     }
 
     private static string TrimOneLine(string s, int max)

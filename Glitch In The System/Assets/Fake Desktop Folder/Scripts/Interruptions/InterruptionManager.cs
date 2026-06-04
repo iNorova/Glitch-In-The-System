@@ -135,6 +135,34 @@ namespace GlitchInTheSystem.Interruptions
         private RectTransform _overlayRect;
         private Vector2 _overlayBasePos;
 
+        // ── PERF FIX #1: cached references to avoid FindAnyObjectByType every frame ──
+        // workDashboard and socialFeed are already [SerializeField] fields above.
+        // These shadow caches are used only when the serialized field is null at runtime
+        // (e.g. scene reload or DDOL edge case). Re-acquire at most once per second.
+        private float _refReacquireTimer;
+        private const float RefReacquireInterval = 1f;
+
+        // Cached AudioListener — avoids FindFirstObjectByType on every sound play.
+        private static AudioListener _cachedAudioListener;
+
+        /// <summary>
+        /// Fills null runtime references without scanning the scene every frame.
+        /// Called from Awake, OnEnable, and lazily from Update at 1 Hz max.
+        /// Safe for DDOL: if a reference is destroyed the next 1s tick re-acquires it.
+        /// </summary>
+        private void TryAcquireReferences()
+        {
+            if (workDashboard == null)
+                workDashboard = FindAnyObjectByType<WorkDashboardController>(FindObjectsInactive.Include);
+
+            if (socialFeed == null)
+                socialFeed = FindAnyObjectByType<SocialMediaFeedController>(FindObjectsInactive.Include);
+
+            if (_cachedAudioListener == null)
+                _cachedAudioListener = FindFirstObjectByType<AudioListener>();
+        }
+        // ── END PERF FIX #1 fields ──
+
         /// <summary>Called by <see cref="InterruptionSceneBootstrap"/> when systems are created at runtime.</summary>
         public void Configure(
             GameObject overlayRoot,
@@ -169,14 +197,20 @@ namespace GlitchInTheSystem.Interruptions
             EnsureAudioSources();
             EnsureDesktopBackground();
 
-            if (socialFeed == null)
-                socialFeed = FindFirstObjectByType<SocialMediaFeedController>();
+            // PERF FIX #1: acquire missing refs once at startup, not every frame.
+            TryAcquireReferences();
 
             if (_overlayRect == null && interruptionOverlayRoot != null)
             {
                 _overlayRect = interruptionOverlayRoot.GetComponent<RectTransform>();
                 CacheOverlayBasePosition();
             }
+        }
+
+        // PERF FIX #1: OnEnable re-acquires refs on scene reload / DDOL re-entry.
+        private void OnEnable()
+        {
+            TryAcquireReferences();
         }
 
         private void CacheOverlayBasePosition()
@@ -336,6 +370,22 @@ namespace GlitchInTheSystem.Interruptions
 
         private void Update()
         {
+            // PERF FIX #1: lazy re-acquire at 1 Hz — only runs when a ref is actually missing.
+            // Zero cost (single bool check) when all refs are valid, which is the normal case.
+            if (workDashboard == null || socialFeed == null || _cachedAudioListener == null)
+            {
+                _refReacquireTimer += Time.unscaledDeltaTime;
+                if (_refReacquireTimer >= RefReacquireInterval)
+                {
+                    _refReacquireTimer = 0f;
+                    TryAcquireReferences();
+                }
+            }
+            else
+            {
+                _refReacquireTimer = 0f;
+            }
+
             if (allowDebugTriggerKey && WasDebugTriggerPressed())
             {
                 StartInterruption();
@@ -410,22 +460,18 @@ namespace GlitchInTheSystem.Interruptions
         private bool IsInterruptionEligibleOpen() =>
             IsWorkDashboardOpen() || IsSocialFeedOpen();
 
+        // PERF FIX #1: use cached ref — no FindAnyObjectByType in hot path.
         private bool IsWorkDashboardOpen()
         {
-            if (workDashboard == null)
-                workDashboard = FindAnyObjectByType<WorkDashboardController>(FindObjectsInactive.Include);
-
             if (workDashboard == null)
                 return false;
 
             return workDashboard.isActiveAndEnabled && workDashboard.gameObject.activeInHierarchy;
         }
 
+        // PERF FIX #1: use cached ref — no FindAnyObjectByType in hot path.
         private bool IsSocialFeedOpen()
         {
-            if (socialFeed == null)
-                socialFeed = FindAnyObjectByType<SocialMediaFeedController>(FindObjectsInactive.Include);
-
             if (socialFeed == null)
                 return false;
 
@@ -517,8 +563,10 @@ namespace GlitchInTheSystem.Interruptions
                 yield break;
             }
 
-            Canvas.ForceUpdateCanvases();
-            LayoutRebuilder.ForceRebuildLayoutImmediate(popupContainer);
+            // PERF: removed Canvas.ForceUpdateCanvases + ForceRebuildLayoutImmediate here.
+            // popupContainer is a full-screen stretch rect with no layout children yet at this
+            // point — forcing a rebuild on it does nothing. GetPopupSpawnBounds has a fallback
+            // size and popups use anchoredPosition, not layout-driven placement.
             GetPopupSpawnBounds(out _spawnMinX, out _spawnMaxX, out _spawnMinY, out _spawnMaxY);
             _spawnedPopupPositions.Clear();
             _remainingPopups = 0;
@@ -645,8 +693,9 @@ namespace GlitchInTheSystem.Interruptions
             popupContainer.anchoredPosition = Vector2.zero;
             popupContainer.sizeDelta = Vector2.zero;
             popupContainer.localScale = Vector3.one;
-
-            LayoutRebuilder.ForceRebuildLayoutImmediate(popupContainer);
+            // PERF: removed ForceRebuildLayoutImmediate — anchor correction is sufficient.
+            // Popups are placed via anchoredPosition, not content-size-driven layout,
+            // so an immediate flush is not needed and caused an unnecessary spike.
         }
 
         private void PlacePopupRandom(RectTransform rt, int index, int total, float minX, float maxX, float minY, float maxY)
@@ -862,6 +911,14 @@ namespace GlitchInTheSystem.Interruptions
             }
         }
 
+        // PERF B4: envelope threshold below which we skip the anchoredPosition write.
+        // At envelope < 0.02 and jitter = 10px the max offset is 0.2px — sub-pixel,
+        // visually identical, but setting anchoredPosition still marks the RectTransform
+        // dirty and propagates a layout dirty flag up to the FakeDesktop canvas root.
+        // Skipping the write at the tail of each pulse eliminates those dirty marks
+        // with zero visual difference.
+        private const float GlitchEnvelopeWriteThreshold = 0.02f;
+
         private IEnumerator PopupGlitchPulse()
         {
             if (_overlayRect == null)
@@ -877,8 +934,12 @@ namespace GlitchInTheSystem.Interruptions
                 float t = duration <= 0f ? 1f : Mathf.Clamp01(elapsed / duration);
                 float envelope = 1f - Mathf.Abs(2f * t - 1f);
 
-                Vector2 offset = UnityEngine.Random.insideUnitCircle * jitter * envelope;
-                _overlayRect.anchoredPosition = _overlayBasePos + offset;
+                // PERF B4: skip write when offset would be sub-pixel — no dirty mark.
+                if (envelope > GlitchEnvelopeWriteThreshold)
+                {
+                    Vector2 offset = UnityEngine.Random.insideUnitCircle * jitter * envelope;
+                    _overlayRect.anchoredPosition = _overlayBasePos + offset;
+                }
 
                 yield return null;
             }
@@ -919,14 +980,16 @@ namespace GlitchInTheSystem.Interruptions
         {
             if (clip == null) return;
 
+            // PERF FIX #1: use cached AudioListener position — no scene scan per sound play.
             AudioSource.PlayClipAtPoint(clip, GetListenerPosition(), Mathf.Clamp01(volumeScale));
         }
 
+        // PERF FIX #1: cached listener — FindFirstObjectByType removed from this hot path.
+        // _cachedAudioListener is filled in TryAcquireReferences() at Awake/OnEnable/1Hz.
         private static Vector3 GetListenerPosition()
         {
-            var listener = FindFirstObjectByType<AudioListener>();
-            if (listener != null)
-                return listener.transform.position;
+            if (_cachedAudioListener != null)
+                return _cachedAudioListener.transform.position;
 
             if (Camera.main != null)
                 return Camera.main.transform.position;
@@ -942,7 +1005,13 @@ namespace GlitchInTheSystem.Interruptions
             if (minigameManager != null && minigameManager.IsCompleted)
                 return;
 
-            EnsureAudioSources();
+            // PERF B4: removed EnsureAudioSources() from the per-frame path.
+            // _bgmSourceA/B are guaranteed valid when _captchaMusicActive=true because
+            // StartMinigameBackground() calls EnsureAudioSources() before setting the flag.
+            // Only re-acquire if a source is somehow null (destroyed externally — rare edge case).
+            if (_bgmSourceA == null || _bgmSourceB == null)
+                EnsureAudioSources();
+
             MaintainBgmLayer(_bgmSourceA, bgmTrack1.clip, bgmTrack1.volume);
             MaintainBgmLayer(_bgmSourceB, bgmTrack2.clip, bgmTrack2.volume);
         }
@@ -952,12 +1021,17 @@ namespace GlitchInTheSystem.Interruptions
             if (source == null || clip == null)
                 return;
 
+            // PERF B4: removed unconditional property writes for loop/priority/volume.
+            // These are set once in StartBgmLayer and never change during playback.
+            // Writing AudioSource properties every frame marks the audio mixer dirty
+            // and wastes cycles even when the value is identical. Only re-apply if
+            // something is actually wrong (clip swapped or source stopped unexpectedly).
             if (source.clip != clip)
+            {
                 source.clip = clip;
-
-            source.loop = true;
-            source.priority = 0;
-            source.volume = volume;
+                source.loop = true;
+                source.volume = volume;
+            }
 
             if (!source.isPlaying)
                 source.Play();
