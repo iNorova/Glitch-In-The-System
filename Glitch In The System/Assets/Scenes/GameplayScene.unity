@@ -14301,7 +14301,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MinimizableWindow
   windowId: Calculator
   windowRoot: {fileID: 1202275201}
-  taskbarIcon: {fileID: 0}
+  taskbarIcon: {fileID: -3690367680208436787, guid: 0fe89ad57817c8c48a4192c82ddc7ffa, type: 3}
   minimizeButton: {fileID: 675420332}
   windowAnimator: {fileID: 1202275206}
 --- !u!114 &1202275205
