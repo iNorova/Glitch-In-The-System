@@ -188,6 +188,8 @@ namespace GlitchInTheSystem.Algorithm
         /// </summary>
         public bool TryRewritePost(PostData post)
         {
+            if (post == null || post.wasRewrittenByAlgorithm) return false;
+
             float rewriteChance = GetRewriteChanceForCurrentPhase();
 
             rewriteChance *= AlgorithmDayHostility.GetInterferenceMultiplier(AlgorithmDayHostility.GetCurrentDay());
