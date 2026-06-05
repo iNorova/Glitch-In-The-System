@@ -11,7 +11,7 @@ using UnityEngine.InputSystem;
 /// Ensures Start menu behaves like a desktop menu:
 /// - Start button toggles open/close with a Windows-style pop animation
 ///   (scale + fade only — layout position matches the Scene View)
-/// - Clicking FL/W closes the menu
+/// - Clicking outside closes the menu
 /// </summary>
 public sealed class StartMenuController : MonoBehaviour
 {
@@ -41,6 +41,12 @@ public sealed class StartMenuController : MonoBehaviour
     private Vector2 _openPivot;
     private Vector3 _openLocalScale;
     private bool _openLayoutCaptured;
+
+    // ── Cached hit-test objects — allocated once, reused every LateUpdate ────
+    // PointerEventData holds no frame-persistent state we need to reset beyond
+    // .position, which we set explicitly before each RaycastAll call.
+    private PointerEventData _pointerEventData;
+    private readonly List<RaycastResult> _raycastResults = new List<RaycastResult>(32);
 
     private void Awake()
     {
@@ -90,12 +96,12 @@ public sealed class StartMenuController : MonoBehaviour
         if (_menuRect == null) return;
 
         _openAnchoredPosition = _menuRect.anchoredPosition;
-        _openSizeDelta = _menuRect.sizeDelta;
-        _openAnchorMin = _menuRect.anchorMin;
-        _openAnchorMax = _menuRect.anchorMax;
-        _openPivot = _menuRect.pivot;
-        _openLocalScale = _menuRect.localScale;
-        _openLayoutCaptured = true;
+        _openSizeDelta        = _menuRect.sizeDelta;
+        _openAnchorMin        = _menuRect.anchorMin;
+        _openAnchorMax        = _menuRect.anchorMax;
+        _openPivot            = _menuRect.pivot;
+        _openLocalScale       = _menuRect.localScale;
+        _openLayoutCaptured   = true;
     }
 
     /// <summary>Restores the exact RectTransform values authored in the scene.</summary>
@@ -103,12 +109,12 @@ public sealed class StartMenuController : MonoBehaviour
     {
         if (_menuRect == null || !_openLayoutCaptured) return;
 
-        _menuRect.anchorMin = _openAnchorMin;
-        _menuRect.anchorMax = _openAnchorMax;
-        _menuRect.pivot = _openPivot;
+        _menuRect.anchorMin        = _openAnchorMin;
+        _menuRect.anchorMax        = _openAnchorMax;
+        _menuRect.pivot            = _openPivot;
         _menuRect.anchoredPosition = _openAnchoredPosition;
-        _menuRect.sizeDelta = _openSizeDelta;
-        _menuRect.localScale = _openLocalScale;
+        _menuRect.sizeDelta        = _openSizeDelta;
+        _menuRect.localScale       = _openLocalScale;
     }
 
     // Run after UI click handlers so launcher buttons still receive the same click.
@@ -117,21 +123,37 @@ public sealed class StartMenuController : MonoBehaviour
         if (startMenuPanel == null || !startMenuPanel.activeSelf) return;
         if (!IsPrimaryClickDown()) return;
 
-        if (IsPointerOver(startMenuPanel.transform) || (startButton != null && IsPointerOver(startButton.transform)))
-            return;
+        // ── Single RaycastAll for the entire frame ────────────────────────────
+        // Lazy-init here so EventSystem.current is guaranteed valid at this point.
+        if (_pointerEventData == null)
+            _pointerEventData = new PointerEventData(EventSystem.current);
 
-        if (IsPointerOverLauncherButton())
-            return;
+        _pointerEventData.position = GetPointerPosition();
+        _raycastResults.Clear();
+        EventSystem.current.RaycastAll(_pointerEventData, _raycastResults);
+
+        // Check all relevant transforms against the shared results in one pass
+        if (IsPointerOverResults(startMenuPanel.transform))   return;
+        if (startButton          != null && IsPointerOverResults(startButton.transform))          return;
+        if (workDashboardButton  != null && IsPointerOverResults(workDashboardButton.transform))  return;
+        if (fileExplorerButton   != null && IsPointerOverResults(fileExplorerButton.transform))   return;
+        if (desktopIconButton    != null && IsPointerOverResults(desktopIconButton.transform))    return;
 
         AnimateClose();
     }
 
-    private bool IsPointerOverLauncherButton()
+    /// <summary>
+    /// Checks the already-populated _raycastResults list — no additional RaycastAll.
+    /// </summary>
+    private bool IsPointerOverResults(Transform root)
     {
-        if (workDashboardButton != null && IsPointerOver(workDashboardButton.transform)) return true;
-        if (fileExplorerButton != null && IsPointerOver(fileExplorerButton.transform)) return true;
-        if (desktopIconButton != null && IsPointerOver(desktopIconButton.transform)) return true;
-
+        if (root == null) return false;
+        for (int i = 0; i < _raycastResults.Count; i++)
+        {
+            Transform t = _raycastResults[i].gameObject != null
+                ? _raycastResults[i].gameObject.transform : null;
+            if (t != null && (t == root || t.IsChildOf(root))) return true;
+        }
         return false;
     }
 
@@ -228,28 +250,28 @@ public sealed class StartMenuController : MonoBehaviour
         float elapsed = 0f;
 
         Vector3 scaleFrom = opening ? new Vector3(0.85f, 0.85f, 1f) : Vector3.one;
-        Vector3 scaleTo = opening ? _openLocalScale : new Vector3(0.85f, 0.85f, 1f);
+        Vector3 scaleTo   = opening ? _openLocalScale : new Vector3(0.85f, 0.85f, 1f);
 
         float alphaFrom = opening ? 0f : 1f;
-        float alphaTo = opening ? 1f : 0f;
+        float alphaTo   = opening ? 1f : 0f;
 
-        _menuRect.localScale = scaleFrom;
-        _canvasGroup.alpha = alphaFrom;
+        _menuRect.localScale  = scaleFrom;
+        _canvasGroup.alpha    = alphaFrom;
 
         while (elapsed < animDuration)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / animDuration);
+            float t    = Mathf.Clamp01(elapsed / animDuration);
             float ease = EaseOutCubic(t);
 
             _menuRect.localScale = Vector3.LerpUnclamped(scaleFrom, scaleTo, ease);
-            _canvasGroup.alpha = Mathf.Lerp(alphaFrom, alphaTo, ease);
+            _canvasGroup.alpha   = Mathf.Lerp(alphaFrom, alphaTo, ease);
 
             yield return null;
         }
 
         _menuRect.localScale = scaleTo;
-        _canvasGroup.alpha = alphaTo;
+        _canvasGroup.alpha   = alphaTo;
 
         if (opening)
             RestoreOpenLayout();
@@ -308,22 +330,6 @@ public sealed class StartMenuController : MonoBehaviour
 #else
         return Input.mousePosition;
 #endif
-    }
-
-    private static bool IsPointerOver(Transform root)
-    {
-        if (root == null || EventSystem.current == null) return false;
-
-        var data = new PointerEventData(EventSystem.current) { position = GetPointerPosition() };
-        var results = new List<RaycastResult>(16);
-        EventSystem.current.RaycastAll(data, results);
-
-        for (int i = 0; i < results.Count; i++)
-        {
-            var t = results[i].gameObject != null ? results[i].gameObject.transform : null;
-            if (t != null && (t == root || t.IsChildOf(root))) return true;
-        }
-        return false;
     }
 
     private sealed class StartButtonToggleProxy : MonoBehaviour, IPointerDownHandler

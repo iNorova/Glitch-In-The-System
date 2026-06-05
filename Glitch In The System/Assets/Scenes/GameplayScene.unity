@@ -10468,6 +10468,7 @@ GameObject:
   - component: {fileID: 831544705}
   - component: {fileID: 831544704}
   - component: {fileID: 831544703}
+  - component: {fileID: 831544709}
   m_Layer: 0
   m_Name: PaintAppWindow
   m_TagString: Untagged
@@ -10593,6 +10594,22 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 831544701}
   m_CullTransparentMesh: 1
+--- !u!114 &831544709
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831544701}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644c8354fa4b48347a87442007027983, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ResizableWindow
+  windowRect: {fileID: 0}
+  minWidth: 400
+  minHeight: 300
+  handleSize: 18
 --- !u!1 &846159210
 GameObject:
   m_ObjectHideFlags: 0
@@ -11392,6 +11409,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 928410355}
+  - component: {fileID: 928410358}
+  - component: {fileID: 928410357}
+  - component: {fileID: 928410356}
   m_Layer: 0
   m_Name: DrawingArea
   m_TagString: Untagged
@@ -11419,6 +11439,58 @@ RectTransform:
   m_AnchoredPosition: {x: 22, y: -18}
   m_SizeDelta: {x: -44, y: -36}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &928410356
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 928410354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
+  m_Padding: {x: 0, y: 0, z: 0, w: 0}
+  m_Softness: {x: 0, y: 0}
+--- !u!114 &928410357
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 928410354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &928410358
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 928410354}
+  m_CullTransparentMesh: 1
 --- !u!1 &955960163
 GameObject:
   m_ObjectHideFlags: 0
@@ -16626,8 +16698,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 508.54, y: -300}
-  m_SizeDelta: {x: 955.3095, y: 377.84}
+  m_AnchoredPosition: {x: 508.54, y: -314.36}
+  m_SizeDelta: {x: 763.6733, y: 340.1972}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1327326520
 MonoBehaviour:
@@ -24301,6 +24373,7 @@ GameObject:
   - component: {fileID: 1902419277}
   - component: {fileID: 1902419276}
   - component: {fileID: 1902419278}
+  - component: {fileID: 1902419279}
   m_Layer: 0
   m_Name: DrawingCanvas
   m_TagString: Untagged
@@ -24322,11 +24395,11 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 928410355}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_SizeDelta: {x: 740, y: 460}
+  m_Pivot: {x: 0, y: 1}
 --- !u!114 &1902419276
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -24377,6 +24450,19 @@ MonoBehaviour:
   drawingCanvas: {fileID: 1902419276}
   canvasRect: {fileID: 1902419275}
   colorPalettePanel: {fileID: 556548775}
+--- !u!114 &1902419279
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1902419274}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1787a0785c642ef459d382bd7cbf49e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PaintCanvasResizer
+  drawingArea: {fileID: 928410355}
 --- !u!1 &1913275742
 GameObject:
   m_ObjectHideFlags: 0

@@ -65,6 +65,27 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     // call FindFirstObjectByType every time the feed window opens.
     private static InterruptionManager _cachedInterruptionManager;
 
+    // PERF B7: cached display feed list — reused each refresh instead of new List<PostData>().
+    private readonly List<PostData> _displayFeedList = new List<PostData>(32);
+
+    // PERF B7: cached ambient posts — fixed seed 90210 makes output deterministic.
+    // Generated once per unique user-pool size; reused on every subsequent refresh.
+    private readonly List<PostData> _cachedAmbientPosts = new List<PostData>(3);
+    private int _cachedAmbientUserCount = -1;
+
+    // PERF B7: cached filler posts — fixed seeds make output deterministic.
+    // Generated once; reused for every offline refresh.
+    private List<PostData> _cachedFillerPosts;
+
+    // PERF B7: cached GetUser delegate — avoids a closure allocation per RefreshFeed call.
+    private Func<string, UserProfileData> _getUserDelegate;
+
+    // PERF B6: feed card object pool.
+    // Avoids Destroy+Instantiate on every feed rebuild (decision approve/decline).
+    // Pool holds inactive card clones; _poolRoot is a hidden sibling of feedContent.
+    private readonly List<GameObject> _cardPool = new List<GameObject>(16);
+    private Transform _poolRoot;
+
 #if UNITY_EDITOR
     public bool IsEditModeFreeformLayout =>
         GetComponentInChildren<SocialMediaFeedFreeformLayout>(true) != null;
@@ -94,6 +115,11 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
         if (Application.isPlaying)
         {
+            // PERF B7: cache delegate once per enable — avoids closure alloc per RefreshFeed.
+            _getUserDelegate = id => GameDatabase.Instance != null
+                ? GameDatabase.Instance.GetUser(id)
+                : null;
+
             AlgorithmPostAlteredNotifier.PostAltered += OnFeedPostAltered;
             SubscribeToDecisionEvents();
             SetRuntimeFeedHostVisible(forceRuntimeFeedHost);
@@ -120,6 +146,15 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         {
             AlgorithmPostAlteredNotifier.PostAltered -= OnFeedPostAltered;
             UnsubscribeFromDecisionEvents();
+
+            // PERF B6: when the window closes, return any active feed cards to pool.
+            ReturnAllCardsToPool();
+
+            // PERF B7: invalidate ambient cache on disable so a new session with a
+            // different user pool forces regeneration on next enable.
+            _cachedAmbientUserCount = -1;
+            _cachedAmbientPosts.Clear();
+            // Note: _cachedFillerPosts is NOT cleared — filler content never changes.
         }
     }
 
@@ -557,7 +592,8 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             && _feedScrollRectUsedForInit == feedScrollRect;
         float savedScroll = preserveScroll ? feedScrollRect.verticalNormalizedPosition : 1f;
 
-        RebuildEntries(posts, id => GameDatabase.Instance.GetUser(id));
+        // PERF B7: use cached delegate — avoids closure allocation per refresh.
+        RebuildEntries(posts, _getUserDelegate ?? (id => GameDatabase.Instance.GetUser(id)));
 
         if (feedStatsText != null)
         {
@@ -583,9 +619,96 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             RebuildFeedLayout();
     }
 
+    // ── Object pool helpers ──────────────────────────────────────────────────
+
+    // PERF B6: creates/finds the hidden pool root under feedContent's parent.
+    // Deactivated so pooled cards don't render or participate in layout.
+    private void EnsurePoolRoot()
+    {
+        if (_poolRoot != null) return;
+
+        var parent = feedContent != null ? feedContent.parent : transform;
+        var existing = parent.Find("_FeedCardPool");
+        if (existing != null)
+        {
+            _poolRoot = existing;
+            return;
+        }
+
+        var go = new GameObject("_FeedCardPool");
+        go.transform.SetParent(parent, false);
+        go.SetActive(false);
+        _poolRoot = go.transform;
+    }
+
+    // PERF B6: return a card to the pool.
+    // Resets comments panel to closed so it doesn't bleed state onto the next post.
+    private void ReturnCardToPool(GameObject card)
+    {
+        if (card == null) return;
+
+        // Reset comments panel to closed state before pooling
+        ResetCardCommentState(card.transform);
+
+        card.SetActive(false);
+        card.transform.SetParent(_poolRoot, false);
+        _cardPool.Add(card);
+    }
+
+    private static void ResetCardCommentState(Transform cardRoot)
+    {
+        // Close CommentsPanel so it doesn't show stale comments on the next post
+        var panel = cardRoot.Find("CommentsPanel");
+        if (panel == null) panel = cardRoot.Find("CommentsSection/CommentsPanel");
+        if (panel != null) panel.gameObject.SetActive(false);
+    }
+
+    // PERF B6: get a card from pool or instantiate a new one from template.
+    // First-time instantiation strips template marker components (same as before).
+    private GameObject RentCard(RectTransform template)
+    {
+        if (_cardPool.Count > 0)
+        {
+            var pooled = _cardPool[_cardPool.Count - 1];
+            _cardPool.RemoveAt(_cardPool.Count - 1);
+            return pooled;
+        }
+
+        // Pool empty — instantiate a fresh card (same path as before)
+        var clone = Instantiate(template.gameObject, feedContent);
+
+        var marker = clone.GetComponent<SocialMediaFeedPostTemplate>();
+        if (marker != null) Destroy(marker);
+        var legacyEditor = clone.GetComponent<SocialMediaFeedEditorPost>();
+        if (legacyEditor != null) Destroy(legacyEditor);
+
+        return clone;
+    }
+
+    // PERF B6: clears cards back to pool instead of Destroy.
+    private void ReturnAllCardsToPool()
+    {
+        if (feedContent == null) return;
+
+        EnsurePoolRoot();
+
+        for (int i = feedContent.childCount - 1; i >= 0; i--)
+        {
+            var child = feedContent.GetChild(i);
+            if (child == null) continue;
+            if (IsDesignTemplateOrLegacyEditorPost(child)) continue;
+            ReturnCardToPool(child.gameObject);
+        }
+    }
+
     private void RebuildEntries(IReadOnlyList<PostData> posts, Func<string, UserProfileData> getUser)
     {
-        ClearFeedChildren(skipTemplateAndEditorPosts: true);
+        // PERF B6: return existing cards to pool instead of Destroy.
+        // Edit-mode path stays on ClearFeedChildren (Destroy) — pool is play-mode only.
+        if (Application.isPlaying)
+            ReturnAllCardsToPool();
+        else
+            ClearFeedChildren(skipTemplateAndEditorPosts: true);
 
         if (posts.Count == 0)
         {
@@ -596,13 +719,34 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         var template = usePostDesignTemplate ? GetPostDesignTemplate() : null;
         if (template != null)
         {
+            EnsurePoolRoot();
             for (int i = 0; i < posts.Count; i++)
-                CreateFeedCardFromTemplate(template, posts[i], getUser);
+                ActivateFeedCardFromPool(template, posts[i], getUser);
             return;
         }
 
         foreach (var post in posts)
             CreateFeedCard(post, getUser?.Invoke(post.authorUserId));
+    }
+
+    // PERF B6: pooled alternative to CreateFeedCardFromTemplate.
+    // Rents from pool or instantiates fresh, then binds and wires identically.
+    private void ActivateFeedCardFromPool(RectTransform template, PostData post, Func<string, UserProfileData> getUser)
+    {
+        var card = RentCard(template);
+        card.name = $"FeedCard_{post.id}";
+        card.transform.SetParent(feedContent, false);
+        card.transform.SetAsLastSibling();
+        card.SetActive(true);
+
+        var cardRt = card.transform as RectTransform;
+        if (cardRt != null)
+            PrepareClonedCardForFeedLayout(cardRt);
+
+        var user = getUser?.Invoke(post.authorUserId);
+        SocialMediaFeedCardBinder.Apply(card.transform, post, user, expandComments: false, getUser);
+        SocialMediaFeedLayoutConstraints.PrepareRuntimeFeedCard(card.transform as RectTransform);
+        WireRuntimeCommentsToggle(card.transform, post);
     }
 
     private void CreateFeedCardFromTemplate(RectTransform template, PostData post, Func<string, UserProfileData> getUser)
@@ -640,13 +784,19 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         var panelGo = panelTransform.gameObject;
         panelGo.SetActive(false);
 
+        // PERF B9: replaced GetComponentsInChildren<Button>(true) (allocates Button[] array,
+        // walks full card hierarchy) with two direct Transform.Find calls (no allocation,
+        // scans only direct children by name). Same search priority as the original foreach.
         Button toggleButton = null;
-        foreach (var button in cardRoot.GetComponentsInChildren<Button>(true))
+        var actionButtonT = cardRoot.Find("ActionButton");
+        if (actionButtonT != null)
+            toggleButton = actionButtonT.GetComponent<Button>();
+
+        if (toggleButton == null)
         {
-            if (button == null) continue;
-            if (button.name != "ActionButton" && button.name != "CommentsToggle") continue;
-            toggleButton = button;
-            break;
+            var commentsToggleT = cardRoot.Find("CommentsToggle");
+            if (commentsToggleT != null)
+                toggleButton = commentsToggleT.GetComponent<Button>();
         }
 
         if (toggleButton == null) return;
@@ -1167,37 +1317,57 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
 
     private List<PostData> BuildDisplayFeed(List<PostData> approvedPosts)
     {
-        // Player-approved posts first (algorithm may have altered them — personal stakes).
-        var feed = new List<PostData>();
-        if (approvedPosts != null && approvedPosts.Count > 0)
-            feed.AddRange(approvedPosts);
+        // PERF B7: reuse _displayFeedList instead of new List<PostData>() each call.
+        _displayFeedList.Clear();
 
+        if (approvedPosts != null && approvedPosts.Count > 0)
+            _displayFeedList.AddRange(approvedPosts);
+
+        // PERF B7: ambient posts are deterministic (fixed seed 90210 + fixed user pool).
+        // Regenerate only when user count changes; reuse cached list otherwise.
         if (GameDatabase.Instance != null && GameDatabase.Instance.Users.Count > 0)
         {
             var users = GameDatabase.Instance.Users;
-            var rng = new System.Random(90210);
-            for (int i = 0; i < 3; i++)
+            if (users.Count != _cachedAmbientUserCount)
             {
-                var author = users[rng.Next(users.Count)];
-                feed.Add(ModerationContentPools.BuildAmbientFeedPost(author, i, rng));
+                _cachedAmbientPosts.Clear();
+                var rng = new System.Random(90210);
+                for (int i = 0; i < 3; i++)
+                {
+                    var author = users[rng.Next(users.Count)];
+                    _cachedAmbientPosts.Add(ModerationContentPools.BuildAmbientFeedPost(author, i, rng));
+                }
+                _cachedAmbientUserCount = users.Count;
             }
+
+            _displayFeedList.AddRange(_cachedAmbientPosts);
         }
 
         var filler = GenerateFillerPosts();
         int fillerCap = Mathf.Min(4, filler.Count);
         for (int f = 0; f < fillerCap; f++)
-            feed.Add(filler[f]);
+            _displayFeedList.Add(filler[f]);
 
-        return feed;
+        return _displayFeedList;
     }
 
     private List<PostData> GenerateFillerPosts()
     {
-        var posts = SocialMediaFeedPreviewData.CreatePlayFillerPosts();
+        // PERF B7: filler posts are deterministic (fixed seeds in CreatePlayFillerPosts).
+        // Generate once and reuse — identical behavior since output never varies.
+        if (_cachedFillerPosts != null)
+            return _cachedFillerPosts;
+
+        // CreatePlayFillerPosts already applies OrganicEngagementUtility internally
+        // with per-post fixed seeds (10000+i). The extra ApplyToPost pass here with
+        // seed 4242 was re-rolling engagement on top — overwriting the first pass.
+        // Preserving the existing behavior means keeping that second pass.
+        _cachedFillerPosts = SocialMediaFeedPreviewData.CreatePlayFillerPosts();
         var rng = new System.Random(4242);
-        foreach (var p in posts)
+        foreach (var p in _cachedFillerPosts)
             OrganicEngagementUtility.ApplyToPost(p, rng, p.category);
-        return posts;
+
+        return _cachedFillerPosts;
     }
 
     // PERF FIX #1 (SocialMedia side): cache InterruptionManager reference.

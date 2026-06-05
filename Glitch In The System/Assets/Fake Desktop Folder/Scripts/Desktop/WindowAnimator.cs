@@ -111,6 +111,15 @@ public sealed class WindowAnimator : MonoBehaviour
         _canvasGroup.blocksRaycasts = true;
         transform.localScale        = Vector3.one * openStartScale;
 
+        // Wait 2 frames before starting the lerp so any OnEnable work triggered by the
+        // same SetActive(true) call (feed card builds, TMP atlas generation, layout passes)
+        // finishes before we begin writing alpha/scale. The window is invisible (alpha=0)
+        // during these frames so there is no visible hold. Fixes first-open stutter on
+        // windows whose OnEnable triggers a synchronous rebuild + a deferred coroutine
+        // (e.g. SocialMediaFeedController.RefreshNextFrame) that both land on frames 0-1.
+        yield return null; // frame 0->1: OnEnable work + deferred coroutines fire
+        yield return null; // frame 1->2: TMP atlas upload and layout dirty flags settle
+
         float t = 0f;
         while (t < 1f)
         {

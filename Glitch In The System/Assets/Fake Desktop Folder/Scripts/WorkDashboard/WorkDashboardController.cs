@@ -99,6 +99,15 @@ public sealed class WorkDashboardController : MonoBehaviour
     // PERF B3: skip all fontSize writes when the multiplier hasn't changed.
     private float _lastAppliedMultiplier = -1f;
 
+    // PERF B8: history entry pool + cap.
+    // All history entries are structurally identical — reuse GameObjects, update text/color only.
+    // Cap at MaxHistoryEntries so VerticalLayoutGroup child count never grows past that,
+    // keeping per-decision layout cost O(1) instead of O(N).
+    private const int MaxHistoryEntries = 30;
+    private readonly Queue<GameObject> _historyEntryPool = new Queue<GameObject>(MaxHistoryEntries);
+    // Tracks live entries in order (oldest first) so we can evict and recycle them.
+    private readonly Queue<GameObject> _liveHistoryEntries = new Queue<GameObject>(MaxHistoryEntries);
+
     /// <summary>Set by <see cref="GlitchInTheSystem.Intro.IntroManager"/> so opening the inactive window doesn't run <see cref="StartSession"/> before the tutorial queue exists.</summary>
     private bool _suppressStartSessionOnce;
     private bool _moderationLocked;
@@ -121,6 +130,15 @@ public sealed class WorkDashboardController : MonoBehaviour
     private static readonly string[] ReputationLabels = { "Trusted", "Neutral", "Low Trust", "Watchlisted" };
     private static readonly string[] RiskLabels = { "Low", "Medium", "High" };
 
+    // PERF B9: cached StringBuilder for BuildPostBodyForDisplay.
+    // Reused every Next() call — Clear() resets length without reallocating the internal buffer.
+    // Static because BuildPostBodyForDisplay is static; safe on Unity's single main thread.
+    private static readonly System.Text.StringBuilder _postBodySb = new System.Text.StringBuilder(256);
+
+    // PERF B9: guard against repeated RemoveAllListeners/AddListener on buttons that are
+    // already wired. Reset in Awake so scene reloads and new instances re-bind correctly.
+    private bool _buttonsWired;
+
     private void Reset()
     {
         AutoBindByName();
@@ -133,6 +151,14 @@ public sealed class WorkDashboardController : MonoBehaviour
         // PERF B3: invalidate TMP cache on every Awake (scene reload / new instance).
         _cachedTmpComponents = null;
         _lastAppliedMultiplier = -1f;
+
+        // PERF B8: clear history state on scene reload so pooled entries from a previous
+        // session don't leak into the new one. The GameObjects are destroyed with the scene.
+        _liveHistoryEntries.Clear();
+        _historyEntryPool.Clear();
+
+        // PERF B9: reset wire guard so Awake always re-binds on a fresh instance.
+        _buttonsWired = false;
         _algorithmUi = GetComponent<WorkDashboardAlgorithmUI>();
         if (_algorithmUi == null)
             _algorithmUi = gameObject.AddComponent<WorkDashboardAlgorithmUI>();
@@ -682,20 +708,23 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private static string BuildPostBodyForDisplay(Post post)
     {
-        var sb = new System.Text.StringBuilder();
+        // PERF B9: reuse cached StringBuilder — Clear() resets length to 0 without
+        // reallocating the internal char buffer. Called every Next() (every decision).
+        _postBodySb.Clear();
+
         if (!string.IsNullOrWhiteSpace(post.CategoryHint))
-            sb.AppendLine(post.CategoryHint);
-        sb.Append(SocialMediaFeedPresentation.SanitizeForTMP(post.Text ?? string.Empty));
+            _postBodySb.AppendLine(post.CategoryHint);
+        _postBodySb.Append(SocialMediaFeedPresentation.SanitizeForTMP(post.Text ?? string.Empty));
         if (!string.IsNullOrWhiteSpace(post.ImageDescription))
         {
-            sb.Append("\n\n[Attached image: ")
+            _postBodySb.Append("\n\n[Attached image: ")
                 .Append(SocialMediaFeedPresentation.SanitizeForTMP(post.ImageDescription))
                 .Append(']');
         }
 
         if (post.HasAttachedComments)
-            sb.Append("\n\n— Comments attached to this report (see thread in feed if approved) —");
-        return sb.ToString().Trim();
+            _postBodySb.Append("\n\n— Comments attached to this report (see thread in feed if approved) —");
+        return _postBodySb.ToString().Trim();
     }
 
     private static string BuildReportLine(Post post)
@@ -717,38 +746,71 @@ public sealed class WorkDashboardController : MonoBehaviour
     {
         if (decisionHistoryContent == null) return;
 
-        var go = new GameObject($"Decision_{DateTime.Now:HHmmssfff}", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        go.transform.SetParent(decisionHistoryContent, false);
+        // PERF B8: evict the oldest live entry back to pool if at cap.
+        // This keeps VerticalLayoutGroup child count ≤ MaxHistoryEntries,
+        // so layout rebuild cost stays flat regardless of how many days are played.
+        if (_liveHistoryEntries.Count >= MaxHistoryEntries)
+        {
+            var evicted = _liveHistoryEntries.Dequeue();
+            if (evicted != null)
+            {
+                evicted.SetActive(false);
+                evicted.transform.SetParent(null, false); // detach from layout
+                _historyEntryPool.Enqueue(evicted);
+            }
+        }
 
-        var tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.fontSize = 14;
-        tmp.raycastTarget = false;
-        tmp.textWrappingMode = TMPro.TextWrappingModes.Normal;
+        // PERF B8: rent from pool or create fresh only when pool is empty.
+        // After the first MaxHistoryEntries decisions, no new GameObjects are ever created.
+        GameObject go;
+        TextMeshProUGUI tmp;
+
+        if (_historyEntryPool.Count > 0)
+        {
+            // Reuse: just update text and color, all components already configured.
+            go = _historyEntryPool.Dequeue();
+            go.transform.SetParent(decisionHistoryContent, false);
+            go.transform.SetAsLastSibling();
+            go.SetActive(true);
+            tmp = go.GetComponent<TextMeshProUGUI>();
+        }
+        else
+        {
+            // First-time creation: identical setup to original code.
+            // PERF B8: removed DateTime.Now.ToString from name — static name saves a string alloc.
+            go = new GameObject("HistoryEntry", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            go.transform.SetParent(decisionHistoryContent, false);
+
+            tmp = go.GetComponent<TextMeshProUGUI>();
+            tmp.fontSize = 14;
+            tmp.raycastTarget = false;
+            tmp.textWrappingMode = TMPro.TextWrappingModes.Normal;
+
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = new Vector2(0, 1);
+            rt.anchorMax = new Vector2(1, 1);
+            rt.pivot     = new Vector2(0.5f, 1);
+            rt.sizeDelta = new Vector2(0, 0);
+
+            var le = go.AddComponent<LayoutElement>();
+            le.preferredHeight = 26;
+        }
+
+        // Apply content — identical to original output, just on a reused or fresh entry.
         bool flagged = !overridden
                        && !approved
                        && !string.IsNullOrEmpty(playerReason)
                        && playerReason.StartsWith(ModerationDecisionFeedback.FlagReasonPrefix, StringComparison.Ordinal);
-        string verb = flagged ? "FLAGGED" : (approved ? "APPROVED" : "DECLINED");
-        string suffix = overridden ? " (OVERRIDDEN)" : "";
-        tmp.text = $"{verb}{suffix}  •  @{person.Username}  •  {TrimOneLine(post.Text, 60)}";
-        tmp.color = flagged ? new Color(1f, 0.86f, 0.45f, 1f)
-            : approved ? new Color(0.65f, 1f, 0.72f, 1f)
-            : new Color(1f, 0.70f, 0.70f, 1f);
+        string verb   = flagged ? "FLAGGED" : (approved ? "APPROVED" : "DECLINED");
+        string suffix = overridden ? " (OVERRIDDEN)" : string.Empty;
+        tmp.text  = $"{verb}{suffix}  •  @{person.Username}  •  {TrimOneLine(post.Text, 60)}";
+        tmp.color = flagged  ? new Color(1f, 0.86f, 0.45f, 1f)
+                  : approved ? new Color(0.65f, 1f, 0.72f, 1f)
+                  :            new Color(1f, 0.70f, 0.70f, 1f);
 
-        var rt = (RectTransform)go.transform;
-        rt.anchorMin = new Vector2(0, 1);
-        rt.anchorMax = new Vector2(1, 1);
-        rt.pivot = new Vector2(0.5f, 1);
-        rt.sizeDelta = new Vector2(0, 0);
+        _liveHistoryEntries.Enqueue(go);
 
-        var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 26;
-
-        // Auto-scroll to bottom.
-        // PERF: removed Canvas.ForceUpdateCanvases() — it flushed the entire canvas
-        // synchronously on every Approve/Decline keypress. The new entry is already
-        // parented; deferring one frame lets Unity measure it naturally and then we
-        // set the scroll position with no visual difference.
+        // Auto-scroll to bottom (deferred — same as before).
         if (decisionHistoryScrollRect != null)
             StartCoroutine(ScrollHistoryToBottomNextFrame());
     }
@@ -973,29 +1035,46 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private void WireButtonsIfPresent()
     {
+        // PERF B9: skip rebinding if already wired — button references never change
+        // after first bind. WireButtonsIfPresent is called 3× per session open
+        // (Awake + StartSession + OnEnable chain); only the first call does real work.
+        // _buttonsWired resets to false in Awake so scene reloads always re-bind.
+        if (_buttonsWired) return;
+
+        bool anyWired = false;
+
         if (approveButton != null)
         {
             approveButton.onClick.RemoveAllListeners();
             approveButton.onClick.AddListener(Approve);
+            anyWired = true;
         }
 
         if (declineButton != null)
         {
             declineButton.onClick.RemoveAllListeners();
             declineButton.onClick.AddListener(Decline);
+            anyWired = true;
         }
 
         if (flagButton != null)
         {
             flagButton.onClick.RemoveAllListeners();
             flagButton.onClick.AddListener(Flag);
+            anyWired = true;
         }
 
         if (dayTransitionProceedButton != null)
         {
             dayTransitionProceedButton.onClick.RemoveAllListeners();
             dayTransitionProceedButton.onClick.AddListener(ProceedToNextDay);
+            anyWired = true;
         }
+
+        // Only mark done if at least one button was found.
+        // If buttons aren't bound yet (AutoBind hasn't run), leave flag false so
+        // the next call retries — correct behaviour on first enable before bindings resolve.
+        if (anyWired) _buttonsWired = true;
     }
 
     private void LogMissingBindingsOnce()

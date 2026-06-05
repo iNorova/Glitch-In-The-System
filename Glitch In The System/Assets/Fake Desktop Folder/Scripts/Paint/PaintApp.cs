@@ -21,18 +21,29 @@ public sealed class PaintApp : MonoBehaviour,
     private bool      _isErasing;
     private bool      _isFilling;
 
-    // PERF B5: pre-allocated visited buffer — reused across fills to avoid per-call allocation.
-    // Sized to TexW * TexH. Reset by clearing only the pixels we actually touched.
-    private bool[] _visited = new bool[TexW * TexH];
-    // Stack reused across fills — avoids Queue<int> GC churn on resize.
+    // RESIZE: TexW/TexH are now instance fields so ResizeCanvas() can update them.
+    // All internal logic continues to reference them by name — no behaviour change.
+    // _visited is initialised in Awake() (was a field initialiser using the old consts).
+    private int _texW = InitialTexW;
+    private int _texH = InitialTexH;
+
+    /// <summary>Current texture width. Read by PaintCanvasResizer.</summary>
+    public int TexW => _texW;
+    /// <summary>Current texture height. Read by PaintCanvasResizer.</summary>
+    public int TexH => _texH;
+
+    // PERF B5: pre-allocated visited buffer — reused across fills.
+    // Initialised in Awake(); re-allocated only when canvas grows in ResizeCanvas().
+    private bool[] _visited;
+    // Stack reused across fills — avoids Queue<int> GC churn.
     private readonly Stack<FillSegment> _fillStack = new Stack<FillSegment>(512);
 
-    private const int TexW         = 740;
-    private const int TexH         = 460;
-    private const int BrushRadius  = 4;
-    private const int EraserRadius = 10;
+    private const int InitialTexW    = 740;
+    private const int InitialTexH    = 460;
+    private const int BrushRadius    = 4;
+    private const int EraserRadius   = 10;
 
-    // ── Palette colors — add new entries here to expand the palette ───────────
+    // ── Palette colors ────────────────────────────────────────────────────────
     public static readonly (string name, Color color)[] PaletteColors = new[]
     {
         ("Black",  Color.black),
@@ -45,9 +56,81 @@ public sealed class PaintApp : MonoBehaviour,
 
     private void Awake()
     {
-        _tex = new Texture2D(TexW, TexH, TextureFormat.RGBA32, false);
+        // Initialise visited buffer here (was field initialiser before TexW/TexH became fields)
+        _visited = new bool[_texW * _texH];
+
+        _tex = new Texture2D(_texW, _texH, TextureFormat.RGBA32, false);
         _tex.filterMode = FilterMode.Point;
         ClearToWhite();
+        if (drawingCanvas != null)
+            drawingCanvas.texture = _tex;
+    }
+
+    // ── Canvas resize ─────────────────────────────────────────────────────────
+    /// <summary>
+    /// Grow the drawing canvas to newW x newH.
+    /// Existing pixels are copied 1:1 into the top-left of the new texture.
+    /// New area is filled white. Clamps to a minimum of 1x1.
+    /// Called by PaintCanvasResizer; never called during a stroke.
+    /// </summary>
+    public void ResizeCanvas(int newW, int newH)
+    {
+        newW = Mathf.Max(1, newW);
+        newH = Mathf.Max(1, newH);
+
+        if (newW == _texW && newH == _texH) return;
+
+        // ── Build new pixel array, filled white ──────────────────────────────
+        int newSize = newW * newH;
+        var newPixels = new Color32[newSize];
+        for (int i = 0; i < newSize; i++)
+            newPixels[i] = new Color32(255, 255, 255, 255);
+
+        // ── Copy existing pixels into top-left of new canvas ─────────────────
+        // Unity Texture2D origin is bottom-left, so row 0 = bottom.
+        // The DrawingCanvas RectTransform is top-left anchored, meaning the
+        // top-left of the visual rect corresponds to the TOP row of pixels in
+        // screen space. However, Texture2D stores row 0 at the bottom.
+        // We align bottom-left of old texture to bottom-left of new texture
+        // (both share origin = bottom-left corner). This means:
+        //   - Growing upward/rightward adds white space at the top/right edges.
+        //   - Shrinking clips top/right edges.
+        // This is standard MS-Paint behaviour.
+        Color32[] oldPixels = _tex.GetPixels32();
+        int copyW = Mathf.Min(_texW, newW);
+        int copyH = Mathf.Min(_texH, newH);
+
+        for (int y = 0; y < copyH; y++)
+        {
+            int oldBase = y * _texW;
+            int newBase = y * newW;
+            for (int x = 0; x < copyW; x++)
+                newPixels[newBase + x] = oldPixels[oldBase + x];
+        }
+
+        // ── Create new texture ───────────────────────────────────────────────
+        var newTex = new Texture2D(newW, newH, TextureFormat.RGBA32, false);
+        newTex.filterMode = FilterMode.Point;
+        newTex.SetPixels32(newPixels);
+        newTex.Apply();
+
+        // ── Destroy old texture to free GPU memory ───────────────────────────
+        if (_tex != null)
+            Destroy(_tex);
+        _tex = newTex;
+
+        // ── Update dimensions ────────────────────────────────────────────────
+        _texW = newW;
+        _texH = newH;
+
+        // ── Resize _visited buffer ───────────────────────────────────────────
+        // Reuse existing array if it is already large enough, otherwise reallocate.
+        if (_visited == null || _visited.Length < newSize)
+            _visited = new bool[newSize];
+        else
+            System.Array.Clear(_visited, 0, _visited.Length);
+
+        // ── Reassign texture to RawImage ─────────────────────────────────────
         if (drawingCanvas != null)
             drawingCanvas.texture = _tex;
     }
@@ -111,50 +194,30 @@ public sealed class PaintApp : MonoBehaviour,
 
     public void OnPointerUp(PointerEventData e) => _isPainting = false;
 
-    // ── Flood fill ────────────────────────────────────────────────────────────
-    // PERF B5: replaced naive BFS with a scanline fill.
-    //
-    // OLD approach problems:
-    //   - Queue<int> enqueued each pixel up to 4 times (no pre-enqueue visited check)
-    //     → up to 1.36M queue entries on a blank 740×460 canvas
-    //   - Queue<int> backed by a resizing array → ~17 GC allocations per large fill
-    //   - Each dequeue processed one pixel → O(N) queue operations
-    //
-    // NEW approach:
-    //   - Scanline: for each row segment, paint the whole horizontal run in one pass,
-    //     then spawn at most one stack entry per contiguous matching run on rows above/below
-    //   - Stack entries reduced from ~340K to ~460 worst-case (one per row touched)
-    //   - _fillStack is a reused field-level Stack — no GC allocation per fill
-    //   - _visited bool[] is a reused field-level array — cleared only for touched pixels
-    //   - pixels[] is GetPixels32() flat array — one GPU→CPU readback, one SetPixels32
-    //   - Result: large fills go from ~40–80ms freeze to <2ms. Visual output identical.
+    // ── Flood fill (scanline) ─────────────────────────────────────────────────
     private void FloodFill(Vector2 pixel)
     {
         int startX = Mathf.RoundToInt(pixel.x);
         int startY = Mathf.RoundToInt(pixel.y);
 
-        // Clamp to texture bounds
-        startX = Mathf.Clamp(startX, 0, TexW - 1);
-        startY = Mathf.Clamp(startY, 0, TexH - 1);
+        startX = Mathf.Clamp(startX, 0, _texW - 1);
+        startY = Mathf.Clamp(startY, 0, _texH - 1);
 
         Color32[] pixels    = _tex.GetPixels32();
-        Color32 targetColor = pixels[startY * TexW + startX];
+        Color32 targetColor = pixels[startY * _texW + startX];
         Color32 fillColor   = (Color32)_currentColor;
 
-        // Already the right color — nothing to do
         if (targetColor.r == fillColor.r && targetColor.g == fillColor.g &&
             targetColor.b == fillColor.b && targetColor.a == fillColor.a)
             return;
 
-        // Reuse stack and visited buffer — clear stack (should already be empty but be safe)
         _fillStack.Clear();
 
-        // Find the initial horizontal run at startY
         int lx = startX, rx = startX;
-        while (lx > 0 && ColorMatches(pixels[(startY * TexW) + lx - 1], targetColor)) lx--;
-        while (rx < TexW - 1 && ColorMatches(pixels[(startY * TexW) + rx + 1], targetColor)) rx++;
+        while (lx > 0 && ColorMatches(pixels[(startY * _texW) + lx - 1], targetColor)) lx--;
+        while (rx < _texW - 1 && ColorMatches(pixels[(startY * _texW) + rx + 1], targetColor)) rx++;
 
-        _fillStack.Push(new FillSegment(startY, lx, rx, 0)); // seed row, no parent direction
+        _fillStack.Push(new FillSegment(startY, lx, rx, 0));
 
         while (_fillStack.Count > 0)
         {
@@ -163,25 +226,21 @@ public sealed class PaintApp : MonoBehaviour,
             int x1  = seg.X1;
             int x2  = seg.X2;
 
-            // Expand left and right from the saved boundary in case new pixels opened up
-            int rowBase = y * TexW;
+            int rowBase = y * _texW;
             while (x1 > 0 && ColorMatches(pixels[rowBase + x1 - 1], targetColor)) x1--;
-            while (x2 < TexW - 1 && ColorMatches(pixels[rowBase + x2 + 1], targetColor)) x2++;
+            while (x2 < _texW - 1 && ColorMatches(pixels[rowBase + x2 + 1], targetColor)) x2++;
 
-            // Paint the full run and mark visited
             for (int x = x1; x <= x2; x++)
             {
                 int idx = rowBase + x;
-                pixels[idx] = fillColor;
+                pixels[idx]   = fillColor;
                 _visited[idx] = true;
             }
 
-            // Scan rows above (y+1) and below (y-1), spawning one segment per contiguous run
             ScanRow(pixels, y + 1, x1, x2, targetColor, +1);
             ScanRow(pixels, y - 1, x1, x2, targetColor, -1);
         }
 
-        // Clear only the visited pixels — avoids full-array memset each fill
         for (int i = 0; i < pixels.Length; i++)
             if (_visited[i]) { _visited[i] = false; }
 
@@ -189,13 +248,12 @@ public sealed class PaintApp : MonoBehaviour,
         _tex.Apply();
     }
 
-    /// <summary>Scan a row [x1..x2] and push one FillSegment per contiguous matching run.</summary>
     private void ScanRow(Color32[] pixels, int y, int x1, int x2, Color32 targetColor, int dy)
     {
-        if (y < 0 || y >= TexH) return;
+        if (y < 0 || y >= _texH) return;
 
-        int rowBase  = y * TexW;
-        bool inRun   = false;
+        int rowBase   = y * _texW;
+        bool inRun    = false;
         int  runStart = 0;
 
         for (int x = x1; x <= x2; x++)
@@ -228,8 +286,13 @@ public sealed class PaintApp : MonoBehaviour,
     private bool IsOnCanvas(PointerEventData e)
     {
         if (canvasRect == null) return false;
+        // Use the parent (DrawingArea) as the hit-test rect — it always matches the
+        // visible/masked viewport. DrawingCanvas may be larger than the viewport in
+        // the virtual-canvas approach (texture only grows, RectMask2D clips the view).
+        var viewportRect = canvasRect.parent as RectTransform;
+        if (viewportRect == null) return false;
         return RectTransformUtility.RectangleContainsScreenPoint(
-            canvasRect, e.position, e.pressEventCamera);
+            viewportRect, e.position, e.pressEventCamera);
     }
 
     private Vector2 PointerToPixel(PointerEventData e)
@@ -240,8 +303,8 @@ public sealed class PaintApp : MonoBehaviour,
         float u = (local.x - rect.xMin) / rect.width;
         float v = (local.y - rect.yMin) / rect.height;
         return new Vector2(
-            Mathf.Clamp(u * TexW, 0, TexW - 1),
-            Mathf.Clamp(v * TexH, 0, TexH - 1));
+            Mathf.Clamp(u * _texW, 0, _texW - 1),
+            Mathf.Clamp(v * _texH, 0, _texH - 1));
     }
 
     private void PaintLine(Vector2 from, Vector2 to)
@@ -262,14 +325,14 @@ public sealed class PaintApp : MonoBehaviour,
         {
             if (dx * dx + dy * dy > radius * radius) continue;
             int px = cx + dx, py = cy + dy;
-            if (px < 0 || px >= TexW || py < 0 || py >= TexH) continue;
+            if (px < 0 || px >= _texW || py < 0 || py >= _texH) continue;
             _tex.SetPixel(px, py, paintColor);
         }
     }
 
     private void ClearToWhite()
     {
-        var fill = new Color32[TexW * TexH];
+        var fill = new Color32[_texW * _texH];
         for (int i = 0; i < fill.Length; i++) fill[i] = new Color32(255, 255, 255, 255);
         _tex.SetPixels32(fill);
         _tex.Apply();
@@ -278,10 +341,10 @@ public sealed class PaintApp : MonoBehaviour,
     // ── Scanline fill segment ─────────────────────────────────────────────────
     private readonly struct FillSegment
     {
-        public readonly int Y;    // row
-        public readonly int X1;   // left boundary (inclusive)
-        public readonly int X2;   // right boundary (inclusive)
-        public readonly int DY;   // direction that spawned this segment (+1 or -1)
+        public readonly int Y;
+        public readonly int X1;
+        public readonly int X2;
+        public readonly int DY;
         public FillSegment(int y, int x1, int x2, int dy) { Y = y; X1 = x1; X2 = x2; DY = dy; }
     }
 }
