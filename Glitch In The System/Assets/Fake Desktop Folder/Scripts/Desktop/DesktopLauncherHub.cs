@@ -10,6 +10,7 @@ public static class DesktopLauncherHub
     private static DesktopAppWindow _workDashboard;
     private static SimpleAppWindow  _socialMedia;
     private static SimpleAppWindow  _paintApp;
+    private static SimpleAppWindow  _stickyNotes;
 
     public static void EnsureInitialized()
     {
@@ -47,6 +48,16 @@ public static class DesktopLauncherHub
         _paintApp?.OpenFromLauncher();
     }
 
+    public static void OpenStickyNotes()
+    {
+        if (DesktopTutorialScope.IsContentModeratorOnly) return;
+
+        EnsureInitialized();
+        if (_stickyNotes == null)
+            _stickyNotes = DesktopAppLocator.Find<SimpleAppWindow>("StickyNotes", "StickyNotesApp");
+        _stickyNotes?.OpenFromLauncher();
+    }
+
     private static void CacheWindows()
     {
         if (_workDashboard == null)
@@ -55,6 +66,8 @@ public static class DesktopLauncherHub
             _socialMedia = DesktopAppLocator.Find<SimpleAppWindow>("SocialMedia", "SocialMediaApp");
         if (_paintApp == null)
             _paintApp = DesktopAppLocator.Find<SimpleAppWindow>("Paint", "PaintApp");
+        if (_stickyNotes == null)
+            _stickyNotes = DesktopAppLocator.Find<SimpleAppWindow>("StickyNotes", "StickyNotesApp");
     }
 
     private static void EnsureDesktopCanvas()
@@ -90,6 +103,11 @@ public static class DesktopLauncherHub
         {
             CloseStartMenuIfOpen();
             OpenPaintApp();
+        });
+        WireButton("Sticky Notes Button", () =>
+        {
+            CloseStartMenuIfOpen();
+            OpenStickyNotes();
         });
     }
 

@@ -20,11 +20,20 @@ public static class DesktopLaunchBootstrap
     {
         var workDashboard = DesktopAppLocator.Find<DesktopAppWindow>("ContentModerator", "WorkDashboard");
         var socialMedia = DesktopAppLocator.Find<SimpleAppWindow>("SocialMedia", "SocialMediaApp");
+        var paintApp = DesktopAppLocator.Find<SimpleAppWindow>("Paint", "PaintApp");
+        var stickyNotes = DesktopAppLocator.Find<SimpleAppWindow>("StickyNotes", "StickyNotesApp");
 
         if (workDashboard != null)
             DesktopWindowLayer.PrepareWindowRoot(workDashboard.gameObject);
 
-        if (socialMedia != null && !DesktopTutorialScope.IsContentModeratorOnly)
-            DesktopWindowLayer.PrepareWindowRoot(socialMedia.gameObject);
+        if (!DesktopTutorialScope.IsContentModeratorOnly)
+        {
+            if (socialMedia != null)
+                DesktopWindowLayer.PrepareWindowRoot(socialMedia.gameObject);
+            if (paintApp != null)
+                DesktopWindowLayer.PrepareWindowRoot(paintApp.gameObject);
+            if (stickyNotes != null)
+                DesktopWindowLayer.PrepareWindowRoot(stickyNotes.gameObject);
+        }
     }
 }
