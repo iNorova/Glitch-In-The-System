@@ -39,11 +39,13 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
     [SerializeField] private bool usePostDesignTemplate = true;
     [SerializeField] private RectTransform postDesignTemplate;
 
+#if UNITY_EDITOR
     [Header("Edit mode preview")]
     [Tooltip("While not playing: show the design template under Content for editing.")]
     [SerializeField] private bool keepWindowVisibleInEditMode = true;
     [Tooltip("Expand comment panels on the template so comment lines are visible to edit.")]
     [SerializeField] private bool expandCommentPanelsInEditMode = true;
+#endif
 
     private float _nextRefreshAt;
     private string _lastSignature;
@@ -318,7 +320,39 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
         if (Application.isPlaying)
             RefreshFeed(force: true);
         else
+        {
+#if UNITY_EDITOR
             PrepareEditModeLayout();
+#endif
+        }
+    }
+
+    public RectTransform GetPostDesignTemplate()
+    {
+        AutoBindPostDesignTemplate();
+        return postDesignTemplate;
+    }
+
+    private void AutoBindPostDesignTemplate()
+    {
+        if (postDesignTemplate != null) return;
+
+        var marker = GetComponentInChildren<SocialMediaFeedPostTemplate>(true);
+        if (marker != null)
+            postDesignTemplate = marker.transform as RectTransform;
+        else if (feedContent != null)
+        {
+            var t = feedContent.Find(SocialMediaFeedPostTemplate.TemplateObjectName);
+            if (t != null)
+                postDesignTemplate = t as RectTransform;
+        }
+    }
+
+    private void SetDesignTemplateVisible(bool visible)
+    {
+        var template = GetPostDesignTemplate();
+        if (template != null)
+            template.gameObject.SetActive(visible);
     }
 
 #if UNITY_EDITOR
@@ -495,34 +529,6 @@ public sealed class SocialMediaFeedController : MonoBehaviour, IScrollHandler
             tmp.enabled = true;
             tmp.gameObject.SetActive(true);
         }
-    }
-
-    public RectTransform GetPostDesignTemplate()
-    {
-        AutoBindPostDesignTemplate();
-        return postDesignTemplate;
-    }
-
-    private void AutoBindPostDesignTemplate()
-    {
-        if (postDesignTemplate != null) return;
-
-        var marker = GetComponentInChildren<SocialMediaFeedPostTemplate>(true);
-        if (marker != null)
-            postDesignTemplate = marker.transform as RectTransform;
-        else if (feedContent != null)
-        {
-            var t = feedContent.Find(SocialMediaFeedPostTemplate.TemplateObjectName);
-            if (t != null)
-                postDesignTemplate = t as RectTransform;
-        }
-    }
-
-    private void SetDesignTemplateVisible(bool visible)
-    {
-        var template = GetPostDesignTemplate();
-        if (template != null)
-            template.gameObject.SetActive(visible);
     }
 
     /// <summary>Optional: fill sample text without changing RectTransforms.</summary>
