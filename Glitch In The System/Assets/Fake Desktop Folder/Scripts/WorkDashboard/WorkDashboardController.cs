@@ -139,6 +139,11 @@ public sealed class WorkDashboardController : MonoBehaviour
     // already wired. Reset in Awake so scene reloads and new instances re-bind correctly.
     private bool _buttonsWired;
 
+    // PERF: short-circuit AutoBindByName() once all required refs are resolved.
+    // Mirrors the proven SocialMediaFeedController._autoBindDone pattern.
+    // Reset in Awake so scene reloads and new instances always re-bind from scratch.
+    private bool _autoBindDone;
+
     private void Reset()
     {
         AutoBindByName();
@@ -159,6 +164,8 @@ public sealed class WorkDashboardController : MonoBehaviour
 
         // PERF B9: reset wire guard so Awake always re-binds on a fresh instance.
         _buttonsWired = false;
+        // PERF: reset bind-done flag so Awake always re-binds on a fresh instance.
+        _autoBindDone = false;
         _algorithmUi = GetComponent<WorkDashboardAlgorithmUI>();
         if (_algorithmUi == null)
             _algorithmUi = gameObject.AddComponent<WorkDashboardAlgorithmUI>();
@@ -250,7 +257,7 @@ public sealed class WorkDashboardController : MonoBehaviour
                 return;
             }
 
-            // Re-opening after ≥1 decisions (true resume). Not fired on first post at 0/N — that wrongly showed “Session resumed”.
+            // Re-opening after ≥1 decisions (true resume). Not fired on first post at 0/N — that wrongly showed "Session resumed".
             if (db.HasResumeableModerationSession())
             {
                 currentIndex = db.GetDecisionsCount();
@@ -942,6 +949,13 @@ public sealed class WorkDashboardController : MonoBehaviour
 
     private void AutoBindByName()
     {
+        // PERF: short-circuit once all required refs are resolved in play mode.
+        // Mirrors SocialMediaFeedController._autoBindDone pattern.
+        // Edit-mode (Reset()) is excluded so the Inspector binding always runs fully.
+        // _autoBindDone resets to false in Awake so scene reloads re-bind correctly.
+        if (Application.isPlaying && _autoBindDone)
+            return;
+
         // Finds common names created by the builder; if you rename objects, you can set fields in the Inspector.
         dayInfoText ??= FindTMP("DayInfo");
 
@@ -978,6 +992,22 @@ public sealed class WorkDashboardController : MonoBehaviour
         dayTransitionPanel ??= FindRect("FloatingPanel/DayTransitionPanel");
         dayTransitionPanel ??= FindRect("DayTransitionPanel");
         dayTransitionProceedButton ??= FindButton("DayTransitionProceedButton");
+
+        // PERF: mark done only when all fields required by EnsureReady() are resolved.
+        // Optional fields (decisionHistoryContent, dayTransitionPanel, flagButton, etc.)
+        // are allowed to remain null — their absence must not block the short-circuit,
+        // matching the existing ??= behaviour which silently no-ops when they're missing.
+        if (Application.isPlaying &&
+            dayInfoText != null &&
+            usernameText != null && displayNameText != null && accountAgeText != null &&
+            followersText != null && followingText != null && strikesText != null &&
+            reputationText != null && riskText != null &&
+            queueText != null && postUserText != null && timestampText != null &&
+            postText != null && engagementRowText != null &&
+            approveButton != null && declineButton != null)
+        {
+            _autoBindDone = true;
+        }
     }
 
     private TMP_Text FindTMP(string name)

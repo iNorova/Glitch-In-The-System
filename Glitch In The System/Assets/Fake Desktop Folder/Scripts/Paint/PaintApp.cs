@@ -38,6 +38,11 @@ public sealed class PaintApp : MonoBehaviour,
     // Stack reused across fills — avoids Queue<int> GC churn.
     private readonly Stack<FillSegment> _fillStack = new Stack<FillSegment>(512);
 
+    // PERF: pre-allocated white pixel buffer — reused every ClearToWhite() call.
+    // Eliminates the ~1.3MB GC allocation that previously occurred on every Clear press.
+    // Re-allocated in ResizeCanvas() when the canvas grows, matching the _visited pattern.
+    private Color32[] _whitePixels;
+
     private const int InitialTexW    = 740;
     private const int InitialTexH    = 460;
     private const int BrushRadius    = 4;
@@ -58,6 +63,11 @@ public sealed class PaintApp : MonoBehaviour,
     {
         // Initialise visited buffer here (was field initialiser before TexW/TexH became fields)
         _visited = new bool[_texW * _texH];
+
+        // PERF: initialise white pixel buffer once — reused by every ClearToWhite() call.
+        _whitePixels = new Color32[_texW * _texH];
+        for (int i = 0; i < _whitePixels.Length; i++)
+            _whitePixels[i] = new Color32(255, 255, 255, 255);
 
         _tex = new Texture2D(_texW, _texH, TextureFormat.RGBA32, false);
         _tex.filterMode = FilterMode.Point;
@@ -129,6 +139,17 @@ public sealed class PaintApp : MonoBehaviour,
             _visited = new bool[newSize];
         else
             System.Array.Clear(_visited, 0, _visited.Length);
+
+        // ── Resize _whitePixels buffer ───────────────────────────────────────
+        // Re-allocate and re-fill only when the canvas grows beyond the current buffer.
+        // Matches the _visited reallocation pattern — same condition, same cost point
+        // (canvas resize, not Clear press).
+        if (_whitePixels == null || _whitePixels.Length < newSize)
+        {
+            _whitePixels = new Color32[newSize];
+            for (int i = 0; i < newSize; i++)
+                _whitePixels[i] = new Color32(255, 255, 255, 255);
+        }
 
         // ── Reassign texture to RawImage ─────────────────────────────────────
         if (drawingCanvas != null)
@@ -332,9 +353,9 @@ public sealed class PaintApp : MonoBehaviour,
 
     private void ClearToWhite()
     {
-        var fill = new Color32[_texW * _texH];
-        for (int i = 0; i < fill.Length; i++) fill[i] = new Color32(255, 255, 255, 255);
-        _tex.SetPixels32(fill);
+        // PERF: reuse pre-allocated _whitePixels buffer — zero GC allocation.
+        // Buffer is initialised in Awake() and kept in sync with canvas size in ResizeCanvas().
+        _tex.SetPixels32(_whitePixels, 0);
         _tex.Apply();
     }
 
