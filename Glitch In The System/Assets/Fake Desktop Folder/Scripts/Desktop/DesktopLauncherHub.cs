@@ -11,6 +11,7 @@ public static class DesktopLauncherHub
     private static SimpleAppWindow  _socialMedia;
     private static SimpleAppWindow  _paintApp;
     private static SimpleAppWindow  _stickyNotes;
+    private static SimpleAppWindow  _fileExplorer;  // Batch 7
 
     public static void EnsureInitialized()
     {
@@ -58,6 +59,17 @@ public static class DesktopLauncherHub
         _stickyNotes?.OpenFromLauncher();
     }
 
+    // ── Batch 7: File Explorer launcher ───────────────────────────────────
+    public static void OpenFileExplorer()
+    {
+        if (DesktopTutorialScope.IsContentModeratorOnly) return;
+
+        EnsureInitialized();
+        if (_fileExplorer == null)
+            _fileExplorer = DesktopAppLocator.Find<SimpleAppWindow>("FileExplorer", "FileExplorerApp");
+        _fileExplorer?.OpenFromLauncher();
+    }
+
     private static void CacheWindows()
     {
         if (_workDashboard == null)
@@ -68,6 +80,8 @@ public static class DesktopLauncherHub
             _paintApp = DesktopAppLocator.Find<SimpleAppWindow>("Paint", "PaintApp");
         if (_stickyNotes == null)
             _stickyNotes = DesktopAppLocator.Find<SimpleAppWindow>("StickyNotes", "StickyNotesApp");
+        if (_fileExplorer == null)
+            _fileExplorer = DesktopAppLocator.Find<SimpleAppWindow>("FileExplorer", "FileExplorerApp");
     }
 
     private static void EnsureDesktopCanvas()
@@ -94,10 +108,12 @@ public static class DesktopLauncherHub
             CloseStartMenuIfOpen();
             OpenWorkDashboard();
         });
+        // Batch 7: "File Explorer Button" now correctly opens File Explorer
+        // (was incorrectly wired to OpenSocialMedia — copy-paste artefact).
         WireButton("File Explorer Button", () =>
         {
             CloseStartMenuIfOpen();
-            OpenSocialMedia();
+            OpenFileExplorer();
         });
         WireButton("Paint Button", () =>
         {

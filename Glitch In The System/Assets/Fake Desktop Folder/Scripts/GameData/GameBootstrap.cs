@@ -1,4 +1,5 @@
 using UnityEngine;
+using GlitchInTheSystem.FileSystem;
 using GlitchInTheSystem.Algorithm;
 using GlitchInTheSystem.UI;
 
@@ -59,6 +60,9 @@ namespace GlitchInTheSystem.GameData
                 CreateSystemObject("AlgorithmGlitchHighlight").AddComponent<AlgorithmGlitchHighlight>();
 
             DesktopLauncherHub.EnsureInitialized();
+
+            if (FileSystemService.Instance == null)
+                CreateSystemObject("FileSystemService").AddComponent<FileSystemService>();
         }
 
         public AlgorithmTrustSettings AlgorithmTrustSettings => algorithmTrustSettings;

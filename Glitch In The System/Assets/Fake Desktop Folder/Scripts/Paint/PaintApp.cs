@@ -97,15 +97,6 @@ public sealed class PaintApp : MonoBehaviour,
             newPixels[i] = new Color32(255, 255, 255, 255);
 
         // ── Copy existing pixels into top-left of new canvas ─────────────────
-        // Unity Texture2D origin is bottom-left, so row 0 = bottom.
-        // The DrawingCanvas RectTransform is top-left anchored, meaning the
-        // top-left of the visual rect corresponds to the TOP row of pixels in
-        // screen space. However, Texture2D stores row 0 at the bottom.
-        // We align bottom-left of old texture to bottom-left of new texture
-        // (both share origin = bottom-left corner). This means:
-        //   - Growing upward/rightward adds white space at the top/right edges.
-        //   - Shrinking clips top/right edges.
-        // This is standard MS-Paint behaviour.
         Color32[] oldPixels = _tex.GetPixels32();
         int copyW = Mathf.Min(_texW, newW);
         int copyH = Mathf.Min(_texH, newH);
@@ -134,16 +125,12 @@ public sealed class PaintApp : MonoBehaviour,
         _texH = newH;
 
         // ── Resize _visited buffer ───────────────────────────────────────────
-        // Reuse existing array if it is already large enough, otherwise reallocate.
         if (_visited == null || _visited.Length < newSize)
             _visited = new bool[newSize];
         else
             System.Array.Clear(_visited, 0, _visited.Length);
 
         // ── Resize _whitePixels buffer ───────────────────────────────────────
-        // Re-allocate and re-fill only when the canvas grows beyond the current buffer.
-        // Matches the _visited reallocation pattern — same condition, same cost point
-        // (canvas resize, not Clear press).
         if (_whitePixels == null || _whitePixels.Length < newSize)
         {
             _whitePixels = new Color32[newSize];
@@ -191,6 +178,41 @@ public sealed class PaintApp : MonoBehaviour,
 
     // ── Clear ─────────────────────────────────────────────────────────────────
     public void ClearCanvas() => ClearToWhite();
+
+    // ── Batch 7: Save to File Explorer ───────────────────────────────────────
+    /// <summary>
+    /// Registers the current drawing as a .png entry in /Pictures/Screenshots in
+    /// the virtual file system. Does NOT write actual image bytes — the virtual FS
+    /// stores display-only file entries for the prototype.
+    ///
+    /// Call this from a "Save" button on the Paint UI.
+    /// Returns the new file name (e.g. "screenshot_20240115_143022.png"), or null
+    /// if FileSystemManager is not available.
+    ///
+    /// Drawing logic, canvas, and texture are completely unchanged.
+    /// </summary>
+    public string SaveToExplorer()
+    {
+        var fs = FileSystemManager.Instance;
+        if (fs == null)
+        {
+            Debug.LogWarning("[PaintApp] SaveToExplorer: FileSystemManager not available.");
+            return null;
+        }
+
+        string baseName = "screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var entry = fs.RegisterScreenshot(baseName);
+
+        if (entry == null)
+        {
+            Debug.LogWarning("[PaintApp] SaveToExplorer: Could not create screenshot entry. " +
+                             "Ensure /Pictures/Screenshots exists in the virtual FS.");
+            return null;
+        }
+
+        Debug.Log($"[PaintApp] Saved to File Explorer: {entry.fullPath}");
+        return entry.name;
+    }
 
     // ── Drawing ───────────────────────────────────────────────────────────────
     public void OnPointerDown(PointerEventData e)
@@ -307,9 +329,6 @@ public sealed class PaintApp : MonoBehaviour,
     private bool IsOnCanvas(PointerEventData e)
     {
         if (canvasRect == null) return false;
-        // Use the parent (DrawingArea) as the hit-test rect — it always matches the
-        // visible/masked viewport. DrawingCanvas may be larger than the viewport in
-        // the virtual-canvas approach (texture only grows, RectMask2D clips the view).
         var viewportRect = canvasRect.parent as RectTransform;
         if (viewportRect == null) return false;
         return RectTransformUtility.RectangleContainsScreenPoint(
