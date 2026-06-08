@@ -37,6 +37,36 @@ public sealed class FsItemView : MonoBehaviour,
         if (background != null) background.color  = BgNormal;
     }
 
+    /// <summary>
+    /// Rebind an existing pooled row to a new entry — no GOs created or destroyed.
+    /// Called by FileExplorerApp.PopulateContent when reusing a pool slot.
+    /// </summary>
+    public void Rebind(FileSystemManager.FsEntry entry, Sprite folderIcon, Sprite fileIcon,
+                       Color iconColor)
+    {
+        _entry         = entry;
+        _selected      = false;
+        _lastClickTime = -1f;
+        if (nameLabel  != null) nameLabel.text  = entry.name;
+        if (background != null) background.color = BgNormal;
+        if (iconImage  != null)
+        {
+            bool hasSprite = entry.type == FileSystemManager.EntryType.Folder
+                ? folderIcon != null : fileIcon != null;
+            if (hasSprite)
+            {
+                iconImage.sprite = entry.type == FileSystemManager.EntryType.Folder
+                    ? folderIcon : fileIcon;
+                iconImage.color = Color.white;
+            }
+            else
+            {
+                iconImage.sprite = null;
+                iconImage.color  = iconColor;
+            }
+        }
+    }
+
     public void SetSelected(bool selected)
     {
         _selected = selected;

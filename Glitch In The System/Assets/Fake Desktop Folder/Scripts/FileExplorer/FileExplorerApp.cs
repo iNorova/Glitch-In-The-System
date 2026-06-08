@@ -40,31 +40,47 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     // ── Content ───────────────────────────────────────────────────────────
     private readonly List<FsItemView> _items        = new();
     private FsItemView                _selectedItem;
-    private bool                      _contentLayoutReady; // FIX: guard EnsureContentLayout
+    private bool                      _contentLayoutReady;
+    // Pre-allocated: avoids new List + closure allocs on every right-click
+    private readonly List<(string, System.Action)> _menuItems = new(6);
+    // Item row pool — rows are reused across navigations, never destroyed unless window closes
+    private readonly List<FsItemView> _rowPool = new(32); // FIX: guard EnsureContentLayout
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
-    private void Awake()
-    {
-        // Context menu — created once here, Init() called in OnEnable
-        var cmGO = new GameObject("FsContextMenu", typeof(RectTransform), typeof(FsContextMenu));
-        cmGO.transform.SetParent(transform, false);
-        var cmRT = cmGO.GetComponent<RectTransform>();
-        cmRT.anchorMin = Vector2.zero; cmRT.anchorMax = Vector2.one;
-        cmRT.offsetMin = Vector2.zero; cmRT.offsetMax = Vector2.zero;
-        _contextMenu = cmGO.GetComponent<FsContextMenu>();
+    private void Awake() => EnsureAwakeInit();
 
-        // Rename overlay
-        var rnGO = new GameObject("FsRenameOverlay", typeof(RectTransform), typeof(FsRenameOverlay));
-        rnGO.transform.SetParent(transform, false);
-        _renameOverlay = rnGO.GetComponent<FsRenameOverlay>();
-        _renameOverlay.Init();
+    // Extracted so OnEnable can call it if Awake was skipped (GO inactive at scene load).
+    // Guarded by null-checks — safe to call multiple times; all allocations happen only once.
+    private void EnsureAwakeInit()
+    {
+        if (_contextMenu == null)
+        {
+            var cmGO = new GameObject("FsContextMenu", typeof(RectTransform), typeof(FsContextMenu));
+            cmGO.transform.SetParent(transform, false);
+            var cmRT = cmGO.GetComponent<RectTransform>();
+            cmRT.anchorMin = Vector2.zero; cmRT.anchorMax = Vector2.one;
+            cmRT.offsetMin = Vector2.zero; cmRT.offsetMax = Vector2.zero;
+            _contextMenu = cmGO.GetComponent<FsContextMenu>();
+        }
+
+        if (_renameOverlay == null)
+        {
+            var rnGO = new GameObject("FsRenameOverlay", typeof(RectTransform), typeof(FsRenameOverlay));
+            rnGO.transform.SetParent(transform, false);
+            _renameOverlay = rnGO.GetComponent<FsRenameOverlay>();
+            _renameOverlay.Init();
+        }
 
         EnsurePathText();
-        EnsureContentLayout(); // run once at awake, not per-navigation
+        EnsureContentLayout();
     }
 
     private void OnEnable()
     {
+        // Guard: if Awake was skipped because GO was inactive at scene load,
+        // self-initialise now. All sub-allocations are guarded so this is idempotent.
+        EnsureAwakeInit();
+
         var canvas = GetComponentInParent<Canvas>();
 
         // FIX: Init is now guarded inside FsContextMenu — safe to call every OnEnable
@@ -137,6 +153,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     public void BeginRename(FsItemView view)
     {
+        Debug.Log($"[Rename] BeginRename called. view={view?.name ?? "NULL"} entry={view?.Entry.name ?? "NULL"} _renameOverlay={(_renameOverlay == null ? "NULL" : (_renameOverlay.gameObject == null ? "DESTROYED" : _renameOverlay.name))}");
         if (view == null) return;
         _renameOverlay.Show(
             view.GetComponent<RectTransform>(),
@@ -166,26 +183,22 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     {
         bool isFolder = view.Entry.type == FileSystemManager.EntryType.Folder;
 
-        var items = new List<(string, System.Action)>
-        {
-            ("Rename",     () => BeginRename(view)),
-            ("Delete",     () => DeleteSelected()),
-            ("---",        null),
-            ("New Folder", () => CreateFolder()),
-        };
-
+        _menuItems.Clear();
         if (isFolder)
-            items.Insert(0, ("Open", () => NavigateTo(view.Entry.fullPath)));
+            _menuItems.Add(("Open",       () => NavigateTo(view.Entry.fullPath)));
+        _menuItems.Add(("Rename",     () => BeginRename(view)));
+        _menuItems.Add(("Delete",     () => DeleteSelected()));
+        _menuItems.Add(("---",        null));
+        _menuItems.Add(("New Folder", () => CreateFolder()));
 
-        _contextMenu.ShowAt(screenPos, items);
+        _contextMenu.ShowAt(screenPos, _menuItems);
     }
 
     private void ShowBackgroundContextMenu(Vector2 screenPos)
     {
-        _contextMenu.ShowAt(screenPos, new List<(string, System.Action)>
-        {
-            ("New Folder", () => CreateFolder()),
-        });
+        _menuItems.Clear();
+        _menuItems.Add(("New Folder", () => CreateFolder()));
+        _contextMenu.ShowAt(screenPos, _menuItems);
     }
 
     public void OnPointerClick(PointerEventData e)
@@ -214,8 +227,16 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             }
         }
 
-        if (backButton    != null) backButton.interactable    = _histIdx > 0;
-        if (forwardButton != null) forwardButton.interactable = _histIdx < _history.Count - 1;
+        if (backButton    != null)
+        {
+            backButton.interactable = _histIdx > 0;
+            SetButtonLabelAlpha(backButton,    _histIdx > 0);
+        }
+        if (forwardButton != null)
+        {
+            forwardButton.interactable = _histIdx < _history.Count - 1;
+            SetButtonLabelAlpha(forwardButton, _histIdx < _history.Count - 1);
+        }
 
         // Sync sidebar selection
         foreach (var btn in _sidebarBtns)
@@ -226,7 +247,11 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     private void PopulateContent(string path)
     {
-        foreach (var item in _items) if (item != null) Destroy(item.gameObject);
+        // Deactivate all active items back into pool — no Destroy calls.
+        foreach (var item in _items)
+        {
+            if (item != null) item.gameObject.SetActive(false);
+        }
         _items.Clear();
         _selectedItem = null;
 
@@ -236,8 +261,6 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (fs == null) return;
         var children = fs.GetChildren(path);
 
-        // FIX: EmptyLabel lives outside FileContent (above Viewport or in ContentArea directly)
-        // so ContentSizeFitter collapsing FileContent to 0 doesn't hide it.
         if (emptyLabel != null)
         {
             bool empty = children.Count == 0;
@@ -246,8 +269,60 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             emptyLabel.gameObject.SetActive(empty);
         }
 
+        int poolIdx = 0;
         foreach (var entry in children)
-            _items.Add(BuildItemRow(entry));
+        {
+            FsItemView view;
+            // Find next available pool slot (inactive rows not in _items)
+            while (poolIdx < _rowPool.Count && _rowPool[poolIdx].gameObject.activeSelf)
+                poolIdx++;
+
+            if (poolIdx < _rowPool.Count)
+            {
+                // Reuse pooled row
+                view = _rowPool[poolIdx];
+                Color iconColor = GetIconColor(entry);
+                view.Rebind(entry, folderIcon, fileIcon, iconColor);
+                // Re-wire callbacks (may point to stale closures from previous navigation)
+                view.OnSingleClick = OnItemSingleClick;
+                view.OnDoubleClick = OnItemDoubleClick;
+                view.OnRightClick  = (v, pos) => { OnItemSingleClick(v); ShowItemContextMenu(v, pos); };
+                view.gameObject.SetActive(true);
+                // Ensure correct sibling order in VLG
+                view.transform.SetAsLastSibling();
+                poolIdx++;
+            }
+            else
+            {
+                // Pool exhausted — build a new row and register it
+                view = BuildItemRow(entry);
+                _rowPool.Add(view);
+            }
+
+            // Also update Type label (column 3 child of the row GO)
+            UpdateTypeLabel(view, entry);
+            _items.Add(view);
+        }
+    }
+
+    // Updates the Type column TMP on a pooled or newly built row.
+    private static void UpdateTypeLabel(FsItemView view, FileSystemManager.FsEntry entry)
+    {
+        // Type label is the 3rd child of the row GO (index 2: Icon=0, Name=1, Type=2)
+        var t = view.transform;
+        if (t.childCount < 3) return;
+        var typeTMP = t.GetChild(2).GetComponent<TMPro.TextMeshProUGUI>();
+        if (typeTMP != null) typeTMP.text = GetTypeLabel(entry);
+    }
+
+    private static Color GetIconColor(FileSystemManager.FsEntry entry)
+    {
+        if (entry.type == FileSystemManager.EntryType.Folder)
+            return new Color(0.96f, 0.76f, 0.26f, 1f);
+        if (!string.IsNullOrEmpty(entry.name) &&
+            entry.name.EndsWith(".lnk", System.StringComparison.OrdinalIgnoreCase))
+            return new Color(0.55f, 0.80f, 1.00f, 1f);
+        return new Color(0.65f, 0.67f, 0.72f, 1f);
     }
 
     // FIX: run once (guarded by _contentLayoutReady), not every PopulateContent call
@@ -483,5 +558,13 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         pathText.overflowMode  = TextOverflowModes.Ellipsis;
         pathText.raycastTarget = false;
         pathText.text          = "File Explorer";
+    }
+
+    // Dims button label TMP when button is non-interactable — makes disabled state visible.
+    private static void SetButtonLabelAlpha(Button btn, bool active)
+    {
+        if (btn == null) return;
+        var lbl = btn.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
+        if (lbl != null) lbl.alpha = active ? 1f : 0.30f;
     }
 }

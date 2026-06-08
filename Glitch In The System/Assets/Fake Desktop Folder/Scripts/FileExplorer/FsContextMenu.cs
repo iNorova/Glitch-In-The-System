@@ -25,6 +25,10 @@ public sealed class FsContextMenu : MonoBehaviour
 
     private readonly List<(string label, Action action)> _items = new();
 
+    // Pooled item rows — reused across ShowAt calls to avoid Destroy/Instantiate churn.
+    // Index matches _items order; separators and regular items share the pool.
+    private readonly List<GameObject> _itemPool = new(8);
+
     // ── Init (called by FileExplorerApp.OnEnable) ─────────────────────────
     // Guarded — only builds panel once. Safe to call every OnEnable.
     public void Init(Canvas canvas)
@@ -50,9 +54,13 @@ public sealed class FsContextMenu : MonoBehaviour
         _items.AddRange(menuItems);
         RebuildMenuItems();
 
-        // Convert screen → canvas local
+        // Convert screen → window-local space (panel's parent space).
+        // Using _windowRect (FileExplorerAppWindow) instead of the canvas root
+        // so anchoredPosition is in the same coordinate space as the window
+        // bounds used by ClampPanelToWindow. Without this, the menu spawns
+        // offset by the window's displacement from the canvas center.
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            _canvas.GetComponent<RectTransform>(),
+            _windowRect,
             screenPos, _canvas.worldCamera, out var local);
 
         _panel.anchoredPosition = local;
@@ -76,14 +84,27 @@ public sealed class FsContextMenu : MonoBehaviour
     public bool IsOpen => _open;
 
     // ── Screen boundary clamping ──────────────────────────────────────────
+    // Panel constants — must match BuildPanel() and BuildMenuItem()/BuildSeparator().
+    private const float PanelWidth    = 160f;
+    private const float ItemHeight    = 28f;
+    private const float SepHeight     = 5f;
+    private const float PanelPadding  = 6f;  // VLG top+bottom padding (3+3)
+
     private void ClampPanelToWindow()
     {
         if (_windowRect == null || _panel == null) return;
 
-        Canvas.ForceUpdateCanvases();
+        // Compute panel height analytically instead of calling Canvas.ForceUpdateCanvases().
+        // ForceUpdateCanvases flushes the ENTIRE canvas layout tree synchronously — 2-8ms
+        // spike on every right-click. The panel size is fully predictable from item count.
+        float panelHeight = PanelPadding;
+        foreach (var item in _items)
+            panelHeight += item.label == "---" ? SepHeight : ItemHeight;
+        // VLG spacing: (itemCount - 1) * 1f
+        if (_items.Count > 1) panelHeight += _items.Count - 1;
 
-        var panelPos  = _panel.anchoredPosition;
-        var panelSize = _panel.rect.size;
+        var panelPos = _panel.anchoredPosition;
+        var panelSize = new Vector2(PanelWidth, panelHeight);
         var winSize   = _windowRect.rect.size;
 
         float rightEdge = panelPos.x + panelSize.x;
@@ -153,18 +174,68 @@ public sealed class FsContextMenu : MonoBehaviour
 
     private void RebuildMenuItems()
     {
-        for (int i = _panel.childCount - 1; i >= 0; i--)
-            Destroy(_panel.GetChild(i).gameObject);
-
-        foreach (var item in _items)
+        // Reuse pooled GOs instead of Destroy+Instantiate on every ShowAt.
+        // Grow pool only when needed; hide surplus items.
+        for (int i = 0; i < _items.Count; i++)
         {
-            if (item.label == "---") { BuildSeparator(); continue; }
-            var action = item.action;
-            BuildMenuItem(item.label, () => { Hide(); action?.Invoke(); });
+            var item = _items[i];
+            if (i < _itemPool.Count)
+            {
+                // Reuse existing row — update content in place
+                UpdatePooledItem(_itemPool[i], item.label, item.action);
+                _itemPool[i].SetActive(true);
+            }
+            else
+            {
+                // Pool is smaller than needed — build a new row and add it
+                GameObject go = item.label == "---"
+                    ? BuildSeparator()
+                    : BuildMenuItem(item.label, null); // action wired by UpdatePooledItem
+                _itemPool.Add(go);
+                UpdatePooledItem(go, item.label, item.action);
+            }
+        }
+        // Hide unused pool rows (don't destroy — keep for next open)
+        for (int i = _items.Count; i < _itemPool.Count; i++)
+            _itemPool[i].SetActive(false);
+    }
+
+    private void UpdatePooledItem(GameObject go, string label, Action action)
+    {
+        bool isSep = label == "---";
+        // Separators and menu items have different structures — swap if type changed
+        bool wasSep = go.GetComponent<Button>() == null;
+        if (isSep != wasSep)
+        {
+            // Type mismatch (rare — only if menu structure changes between opens).
+            // Destroy and rebuild this slot; replace in pool.
+            int idx = _itemPool.IndexOf(go);
+            Destroy(go);
+            var rebuilt = isSep ? BuildSeparator() : BuildMenuItem(label, null);
+            if (idx >= 0 && idx < _itemPool.Count) _itemPool[idx] = rebuilt;
+            go = rebuilt;
+        }
+
+        if (isSep) return;
+
+        // Update label
+        var tmp = go.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (tmp != null) tmp.text = label;
+
+        // Re-wire button — clear old listener, add new
+        var btn = go.GetComponent<Button>();
+        if (btn != null)
+        {
+            btn.onClick.RemoveAllListeners();
+            if (action != null)
+            {
+                var capturedAction = action;
+                btn.onClick.AddListener(() => { Hide(); capturedAction.Invoke(); });
+            }
         }
     }
 
-    private void BuildMenuItem(string label, Action onClick)
+    private GameObject BuildMenuItem(string label, Action onClick)
     {
         var go = new GameObject("MI_" + label,
             typeof(RectTransform), typeof(CanvasRenderer),
@@ -181,7 +252,7 @@ public sealed class FsContextMenu : MonoBehaviour
         colors.highlightedColor = new Color(1f, 1f, 1f, 0.13f);
         colors.pressedColor     = new Color(1f, 1f, 1f, 0.22f);
         btn.colors = colors;
-        btn.onClick.AddListener(() => onClick());
+        if (onClick != null) btn.onClick.AddListener(() => onClick());
 
         var lblGO = new GameObject("L",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -195,9 +266,11 @@ public sealed class FsContextMenu : MonoBehaviour
         tmp.color         = new Color(0.90f, 0.88f, 0.84f, 1f);
         tmp.alignment     = TextAlignmentOptions.MidlineLeft;
         tmp.raycastTarget = false;
+
+        return go;
     }
 
-    private void BuildSeparator()
+    private GameObject BuildSeparator()
     {
         var go = new GameObject("Sep",
             typeof(RectTransform), typeof(CanvasRenderer),
@@ -205,6 +278,7 @@ public sealed class FsContextMenu : MonoBehaviour
         go.transform.SetParent(_panel, false);
         go.GetComponent<LayoutElement>().preferredHeight = 5f;
         go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.08f);
+        return go;
     }
 }
 

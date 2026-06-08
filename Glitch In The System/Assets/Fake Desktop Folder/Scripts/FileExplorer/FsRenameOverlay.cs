@@ -22,6 +22,7 @@ public sealed class FsRenameOverlay : MonoBehaviour
     private Action         _onCancel;
     private bool           _active;
     private bool           _submitFired; // prevents double-fire
+    private int            _openedFrame;  // grace period — blocks focus-loss submit on open frame
 
     public void Init()
     {
@@ -36,37 +37,39 @@ public sealed class FsRenameOverlay : MonoBehaviour
         _onCancel    = onCancel;
         _active      = true;
         _submitFired = false;
+        _openedFrame = Time.frameCount;
 
+        // Position overlay in its own parent (FileExplorerApp) coordinate space.
+        // We stay here — NOT re-parented into fileContent — because PopulateContent()
+        // calls Destroy() on all fileContent children, which would destroy this overlay.
+        // Use anchorRT.TransformPoint → InverseTransformPoint to convert the anchor's
+        // world-space corners into our parent's local space. This correctly handles
+        // any scroll offset in the viewport between the anchor row and this transform.
         var overlayRT = GetComponent<RectTransform>();
         if (overlayRT != null)
         {
-            var canvas = GetComponentInParent<Canvas>();
-            if (canvas != null)
-            {
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    canvas.GetComponent<RectTransform>(),
-                    RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, anchorRT.position),
-                    canvas.worldCamera,
-                    out var canvasLocal);
+            var myParentRT = transform.parent as RectTransform;
 
-                overlayRT.anchorMin        = new Vector2(0f, 0f);
-                overlayRT.anchorMax        = new Vector2(0f, 0f);
-                overlayRT.pivot            = new Vector2(0f, 0f);
-                overlayRT.anchoredPosition = canvasLocal;
-                overlayRT.sizeDelta        = new Vector2(anchorRT.rect.width, anchorRT.rect.height);
-            }
-            else
-            {
-                overlayRT.position  = anchorRT.position;
-                overlayRT.sizeDelta = new Vector2(anchorRT.rect.width, anchorRT.rect.height);
-            }
+            // Convert anchor world position into our parent's local space
+            Vector3 worldPos = anchorRT.TransformPoint(new Vector3(anchorRT.rect.xMin, anchorRT.rect.yMin, 0f));
+            Vector2 localPos = myParentRT != null
+                ? (Vector2)myParentRT.InverseTransformPoint(worldPos)
+                : (Vector2)worldPos;
+
+            overlayRT.anchorMin        = new Vector2(0f, 0f);
+            overlayRT.anchorMax        = new Vector2(0f, 0f);
+            overlayRT.pivot            = new Vector2(0f, 0f);
+            overlayRT.anchoredPosition = localPos;
+            overlayRT.sizeDelta        = new Vector2(anchorRT.rect.width, anchorRT.rect.height);
         }
 
+        Debug.Log($"[Rename] Show() called. currentName={currentName} _input={(_input == null ? "NULL" : _input.name)} inputActive={_input?.gameObject.activeInHierarchy} inputInteractable={_input?.interactable} inputReadOnly={_input?.readOnly}");
         _input.text = currentName;
         _input.gameObject.SetActive(true);
-        _input.ActivateInputField();
-        _input.selectionAnchorPosition = 0;
-        _input.selectionFocusPosition  = currentName != null ? currentName.Length : 0;
+        // FIX: ActivateInputField() silently fails when called on the same frame as
+        // SetActive(true) — the EventSystem hasn't processed the activation yet.
+        // Defer one frame via coroutine so keyboard focus actually registers.
+        StartCoroutine(ActivateNextFrame(currentName));
 
         _input.onSubmit.RemoveAllListeners();
         _input.onSubmit.AddListener(_ => Submit());
@@ -94,15 +97,35 @@ public sealed class FsRenameOverlay : MonoBehaviour
         // FIX: was !Input.GetMouseButton(0) — same issue.
         // Guard: submit on focus-loss only when left mouse button is not held,
         // so a click that transfers focus doesn't double-fire immediately.
+        // Grace period: never auto-submit on the same frame Show() was called.
+        // The Rename button click releases the mouse on the same frame Update() runs,
+        // so leftButton.isPressed=false and isFocused=false simultaneously — without
+        // this guard, Submit() fires instantly before the player can type anything.
+        if (Time.frameCount <= _openedFrame + 1) return;
+
         bool leftHeld = Mouse.current?.leftButton.isPressed ?? false;
         if (_input != null && !_input.isFocused && !leftHeld)
+        {
             Submit();
+        }
+    }
+
+    private System.Collections.IEnumerator ActivateNextFrame(string currentName)
+    {
+        yield return null;
+        if (_input == null || !_active) yield break;
+        _input.ActivateInputField();
+        yield return null;
+        Debug.Log($"[Rename] After ActivateInputField — isFocused={_input.isFocused} currentSelected={UnityEngine.EventSystems.EventSystem.current?.currentSelectedGameObject?.name ?? "NONE"}");
+        _input.selectionAnchorPosition = 0;
+        _input.selectionFocusPosition  = currentName != null ? currentName.Length : 0;
     }
 
     private void Submit()
     {
         if (!_active || _submitFired) return;
         _submitFired = true;
+        Debug.Log($"[Rename] Submit() firing. val={(_input != null ? _input.text.Trim() : "NULL")}");
 
         string val = _input != null ? _input.text.Trim() : "";
         Hide();

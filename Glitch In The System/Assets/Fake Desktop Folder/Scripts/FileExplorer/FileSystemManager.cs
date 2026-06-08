@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -31,6 +33,27 @@ public sealed class FileSystemManager : MonoBehaviour
     private readonly Dictionary<string, FsEntry>       _entries  = new();
     private readonly Dictionary<string, List<FsEntry>> _children = new();
 
+    // ── Persistence ───────────────────────────────────────────────────────
+    private const  string SaveKey    = "FileExplorer_v1";
+    private        bool   _dirty;
+    private        float  _dirtySince = float.MaxValue;
+    private const  float  SaveDebounce = 2f; // seconds after last mutation
+
+    [Serializable]
+    private sealed class SaveEnvelope
+    {
+        public List<EntrySave> entries = new List<EntrySave>();
+    }
+
+    [Serializable]
+    private sealed class EntrySave
+    {
+        public string name;
+        public string parentPath;
+        public string fullPath;
+        public bool   isFolder;
+    }
+
     // Batch 7: added "Sticky Notes" to sidebar so the folder appears in sidebar nav.
     public static readonly string[] SidebarRoots =
         { "Desktop", "Documents", "Pictures", "Sticky Notes", "Downloads", "Trash" };
@@ -39,7 +62,8 @@ public sealed class FileSystemManager : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
-        BuildVirtualFS();
+        if (!LoadFromPrefs())
+            BuildVirtualFS();
     }
 
     private void BuildVirtualFS()
@@ -92,6 +116,16 @@ public sealed class FileSystemManager : MonoBehaviour
         AddFile  ("old_project.txt", "/Trash");
     }
 
+    private void Update()
+    {
+        if (!_dirty) return;
+        if (_dirtySince == float.MaxValue) _dirtySince = Time.unscaledTime;
+        if (Time.unscaledTime - _dirtySince >= SaveDebounce)
+            SaveToPrefs();
+    }
+
+    private void OnApplicationQuit() => SaveToPrefs();
+
     // ── Read API ──────────────────────────────────────────────────────────
     public string DisplayName(string fullPath) =>
         fullPath == "" ? "File Explorer"
@@ -116,6 +150,7 @@ public sealed class FileSystemManager : MonoBehaviour
         var e = new FsEntry(name, EntryType.Folder, parentPath);
         if (_entries.ContainsKey(e.fullPath)) return null;
         Register(e);
+        MarkDirty();
         return e;
     }
 
@@ -126,6 +161,7 @@ public sealed class FileSystemManager : MonoBehaviour
         var e = new FsEntry(name, EntryType.File, parentPath);
         if (_entries.ContainsKey(e.fullPath)) return null;
         Register(e);
+        MarkDirty();
         return e;
     }
 
@@ -150,6 +186,7 @@ public sealed class FileSystemManager : MonoBehaviour
 
         // Recursively fix children paths
         RebuildChildPaths(fullPath, newFullPath);
+        MarkDirty();
         return true;
     }
 
@@ -166,6 +203,7 @@ public sealed class FileSystemManager : MonoBehaviour
         }
 
         Unregister(entry);
+        MarkDirty();
         return true;
     }
 
@@ -188,6 +226,7 @@ public sealed class FileSystemManager : MonoBehaviour
         Register(entry);
 
         RebuildChildPaths(oldFull, newFull);
+        MarkDirty();
         return true;
     }
 
@@ -209,6 +248,75 @@ public sealed class FileSystemManager : MonoBehaviour
             name = baseName + "_" + (n++) + ".png";
 
         return CreateFile(folder, name);
+    }
+
+    private void MarkDirty()
+    {
+        _dirty    = true;
+        // Don't reset _dirtySince here — keep the first-dirty timestamp
+        // so the debounce counts from when mutations *started*, not most recent.
+    }
+
+    private void SaveToPrefs()
+    {
+        var envelope = new SaveEnvelope();
+        foreach (var e in _entries.Values)
+            envelope.entries.Add(new EntrySave
+            {
+                name       = e.name,
+                parentPath = e.parentPath,
+                fullPath   = e.fullPath,
+                isFolder   = e.type == EntryType.Folder,
+            });
+        PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(envelope));
+        PlayerPrefs.Save();
+        _dirty     = false;
+        _dirtySince = float.MaxValue;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        UnityEngine.Debug.Log($"[FileExplorer] Saved {envelope.entries.Count} entries to PlayerPrefs.");
+#endif
+    }
+
+    /// <summary>
+    /// Load saved filesystem from PlayerPrefs.
+    /// Returns true if a valid save was found and applied.
+    /// Returns false if no save exists (caller should call BuildVirtualFS).
+    /// </summary>
+    private bool LoadFromPrefs()
+    {
+        string json = PlayerPrefs.GetString(SaveKey, "");
+        if (string.IsNullOrEmpty(json)) return false;
+
+        try
+        {
+            var envelope = JsonUtility.FromJson<SaveEnvelope>(json);
+            if (envelope?.entries == null || envelope.entries.Count == 0) return false;
+
+            foreach (var e in envelope.entries)
+            {
+                var entry = new FsEntry(e.name,
+                    e.isFolder ? EntryType.Folder : EntryType.File,
+                    e.parentPath);
+                // Override the auto-computed fullPath with the saved one
+                // (in case SanitizeName or path logic changes between versions)
+                entry.fullPath = e.fullPath;
+                _entries[entry.fullPath] = entry;
+                if (!_children.ContainsKey(entry.parentPath))
+                    _children[entry.parentPath] = new List<FsEntry>();
+                if (!_children[entry.parentPath].Contains(entry))
+                    _children[entry.parentPath].Add(entry);
+            }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            UnityEngine.Debug.Log($"[FileExplorer] Loaded {envelope.entries.Count} entries from PlayerPrefs.");
+#endif
+            return true;
+        }
+        catch (Exception ex)
+        {
+            UnityEngine.Debug.LogWarning($"[FileExplorer] Load failed: {ex.Message} — rebuilding defaults.");
+            return false;
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
