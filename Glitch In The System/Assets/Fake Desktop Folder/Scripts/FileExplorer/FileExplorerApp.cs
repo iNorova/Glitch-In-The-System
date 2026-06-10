@@ -289,10 +289,13 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         _menuItems.Clear();
         if (isFolder)
             _menuItems.Add(("Open",       () => NavigateTo(view.Entry.fullPath)));
+        _menuItems.Add(("Copy",       () => { OnItemSingleClick(view); CopySelected(); }));
         _menuItems.Add(("Rename",     () => BeginRename(view)));
         _menuItems.Add(("Delete",     () => DeleteSelected()));
         _menuItems.Add(("---",        null));
         _menuItems.Add(("New Folder", () => CreateFolder()));
+        if (_clipboard != null)
+            _menuItems.Add(("Paste",   () => PasteClipboard()));
 
         _contextMenu.ShowAt(screenPos, _menuItems);
     }

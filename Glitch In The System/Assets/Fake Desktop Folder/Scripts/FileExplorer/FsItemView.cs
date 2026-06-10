@@ -45,6 +45,9 @@ public sealed class FsItemView : MonoBehaviour,
     private static FsItemView  _draggingItem;
     private static Canvas      _rootCanvas;
 
+    /// <summary>True while any FsItemView is being dragged. Read by SidebarFolderButton.</summary>
+    public static bool IsDragging => _draggingItem != null;
+
     public void Init(FileSystemManager.FsEntry entry, Sprite folderIcon, Sprite fileIcon)
     {
         _entry = entry;

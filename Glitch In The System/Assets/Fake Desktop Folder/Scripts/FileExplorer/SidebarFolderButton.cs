@@ -60,8 +60,9 @@ public sealed class SidebarFolderButton : MonoBehaviour,
     // ── Hover ──────────────────────────────────────────────────────────────
     public void OnPointerEnter(PointerEventData e)
     {
-        // If something is dragging, show drop target highlight
-        if (_dragging != null && _dragging != this)
+        // Show drop highlight for both sidebar-to-sidebar drags and content-area item drags
+        bool anyDrag = (_dragging != null && _dragging != this) || FsItemView.IsDragging;
+        if (anyDrag)
         {
             if (background != null) background.color = DropTarget;
             return;
@@ -71,11 +72,6 @@ public sealed class SidebarFolderButton : MonoBehaviour,
 
     public void OnPointerExit(PointerEventData e)
     {
-        if (_dragging != null && _dragging != this)
-        {
-            if (background != null) background.color = Normal;
-            return;
-        }
         if (!_selected && background != null) background.color = Normal;
     }
 
@@ -146,10 +142,20 @@ public sealed class SidebarFolderButton : MonoBehaviour,
         // Clear drop highlight
         if (!_selected && background != null) background.color = Normal;
 
-        if (_dragging == null || _dragging == this) return;
+        // Case A: sidebar button dropped onto this sidebar button
+        if (_dragging != null && _dragging != this)
+        {
+            _app?.OnSidebarDrop(_dragging._folderPath, _folderPath);
+            return;
+        }
 
-        // Delegate validation + move to FileExplorerApp (has access to FileSystemManager)
-        _app?.OnSidebarDrop(_dragging._folderPath, _folderPath);
+        // Case B: content-area FsItemView dropped onto this sidebar folder
+        // FsItemView exposes its drop via OnReceivedDrop callback, but sidebar targets
+        // bypass that path — route through FileExplorerApp.MoveSelectedTo instead.
+        if (FsItemView.IsDragging)
+        {
+            _app?.MoveSelectedTo(_folderPath);
+        }
     }
 
     private void OnClick() => _app?.NavigateTo(_folderPath);

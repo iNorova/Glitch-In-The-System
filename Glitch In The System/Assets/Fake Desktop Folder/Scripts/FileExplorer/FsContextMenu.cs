@@ -68,7 +68,10 @@ public sealed class FsContextMenu : MonoBehaviour
         // Backdrop behind panel — catches all outside clicks
         _backdrop.gameObject.SetActive(true);
         _panel.gameObject.SetActive(true);
-        _panel.SetAsLastSibling(); // panel always renders above backdrop
+        // Bring FsContextMenu GO to top of FileExplorerAppWindow children so it
+        // renders above Body/Sidebar. Then bring panel above backdrop within it.
+        transform.SetAsLastSibling();
+        _panel.SetAsLastSibling(); // panel above backdrop
         _open = true;
 
         ClampPanelToWindow();
