@@ -1,32 +1,25 @@
-﻿using UnityEngine;
+using System.IO;
+using UnityEngine;
 
 /// <summary>
-/// Batch 7: Routes File Explorer open/double-click actions to the correct app.
+/// Routes File Explorer open/double-click actions to the correct app.
 ///
 /// Rules (checked in order):
-///   1. Folders       — FileExplorerApp.NavigateTo()            (handled by caller, not here)
+///   1. Folders       — FileExplorerApp.NavigateTo()          (handled by caller)
 ///   2. .lnk files    — launch the named app via DesktopLauncherHub
-///   3. .note files   — open Sticky Notes app
-///   4. .png/.jpg     — open Paint app (view)
-///   5. Everything else — log quietly, no crash, no popup
+///   3. .note files   — open Sticky Notes
+///   4. .png/.jpg     — open IMAGE PREVIEW ONLY (NOT Paint)
+///   5. Everything else — log quietly, no crash
 ///
-/// This is the ONLY place that maps file types to apps. FileExplorerApp delegates
-/// here for all file opens — no routing logic lives in FileExplorerApp itself.
-///
-/// To add a new file handler: add a case to OpenFile(). No other file needs changing.
+/// Only one place maps file types to apps. FileExplorerApp delegates here.
 /// </summary>
 public static class FsAppRouter
 {
-    // App shortcut names (must match BuildVirtualFS lnk file names)
     private const string LnkStickyNotes = "Sticky Notes.lnk";
     private const string LnkPaint       = "Paint.lnk";
     private const string LnkSocialMedia = "Social Media.lnk";
     private const string LnkWorkDash    = "Work Dashboard.lnk";
 
-    /// <summary>
-    /// Called by FileExplorerApp when the user double-clicks a file entry.
-    /// Folders are handled before this is called — only files reach here.
-    /// </summary>
     public static void OpenFile(FileSystemManager.FsEntry entry)
     {
         if (entry == null) return;
@@ -48,7 +41,7 @@ public static class FsAppRouter
             case ".jpg":
             case ".jpeg":
             case ".bmp":
-                DesktopLauncherHub.OpenPaintApp();
+                OpenImageFile(entry);
                 return;
 
             default:
@@ -57,6 +50,36 @@ public static class FsAppRouter
         }
     }
 
+    // ── Image preview — view only, never opens Paint ──────────────────────
+    private static void OpenImageFile(FileSystemManager.FsEntry entry)
+    {
+        // Load from persistentDataPath/Screenshots
+        string filePath = Path.Combine(
+            Application.persistentDataPath, "Screenshots", entry.name);
+
+        if (!File.Exists(filePath))
+        {
+            Debug.LogWarning($"[FsAppRouter] Image file not found on disk: {filePath}");
+            // Still open preview with null — shows empty modal rather than silently failing
+            DesktopLauncherHub.OpenImagePreview(null);
+            return;
+        }
+
+        byte[]    bytes   = File.ReadAllBytes(filePath);
+        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+        texture.filterMode = FilterMode.Bilinear;
+
+        if (!texture.LoadImage(bytes)) // LoadImage auto-resizes
+        {
+            Debug.LogWarning($"[FsAppRouter] Failed to decode image: {filePath}");
+            Object.Destroy(texture);
+            return;
+        }
+
+        DesktopLauncherHub.OpenImagePreview(texture);
+    }
+
+    // ── App shortcuts ─────────────────────────────────────────────────────
     private static void OpenAppShortcut(string lnkName)
     {
         switch (lnkName)

@@ -6,10 +6,14 @@ using UnityEngine;
 /// <summary>
 /// Pure-data virtual file system. Batch 6: mutation API added.
 /// Batch 7: added Sticky Notes folder, app shortcuts on Desktop, Screenshots under Pictures.
+/// Upgrade: NotifyChanged() now called after every mutation so FileExplorerApp.OnFsChanged fires.
 /// </summary>
 public sealed class FileSystemManager : MonoBehaviour
 {
     public static FileSystemManager Instance { get; private set; }
+
+    /// <summary>Fired whenever the virtual FS changes (create/rename/delete/register).</summary>
+    public event System.Action OnChanged;
 
     public enum EntryType { Folder, File }
 
@@ -37,7 +41,7 @@ public sealed class FileSystemManager : MonoBehaviour
     private const  string SaveKey    = "FileExplorer_v1";
     private        bool   _dirty;
     private        float  _dirtySince = float.MaxValue;
-    private const  float  SaveDebounce = 2f; // seconds after last mutation
+    private const  float  SaveDebounce = 2f;
 
     [Serializable]
     private sealed class SaveEnvelope
@@ -54,7 +58,6 @@ public sealed class FileSystemManager : MonoBehaviour
         public bool   isFolder;
     }
 
-    // Batch 7: added "Sticky Notes" to sidebar so the folder appears in sidebar nav.
     public static readonly string[] SidebarRoots =
         { "Desktop", "Documents", "Pictures", "Sticky Notes", "Downloads", "Trash" };
 
@@ -68,22 +71,17 @@ public sealed class FileSystemManager : MonoBehaviour
 
     private void BuildVirtualFS()
     {
-        // ── Top-level sidebar folders ─────────────────────────────────────
         foreach (var root in SidebarRoots) AddFolder(root, "");
 
-        // ── Desktop ───────────────────────────────────────────────────────
         AddFolder("Screenshots",     "/Desktop");
         AddFolder("Projects",        "/Desktop");
         AddFile  ("readme.txt",      "/Desktop");
         AddFile  ("notes.txt",       "/Desktop");
-
-        // Batch 7: App shortcuts on Desktop — double-click launches the app via FsAppRouter.
         AddFile("Sticky Notes.lnk",   "/Desktop");
         AddFile("Paint.lnk",          "/Desktop");
         AddFile("Social Media.lnk",   "/Desktop");
         AddFile("Work Dashboard.lnk", "/Desktop");
 
-        // ── Documents ─────────────────────────────────────────────────────
         AddFolder("Work",            "/Documents");
         AddFolder("Personal",        "/Documents");
         AddFile  ("budget.txt",      "/Documents");
@@ -92,27 +90,19 @@ public sealed class FileSystemManager : MonoBehaviour
         AddFile  ("q1_report.txt",   "/Documents/Work");
         AddFile  ("q2_report.txt",   "/Documents/Work");
 
-        // ── Pictures ──────────────────────────────────────────────────────
         AddFolder("Wallpapers",      "/Pictures");
-        // Batch 7: Screenshots folder — PaintApp.SaveToExplorer() writes here.
         AddFolder("Screenshots",     "/Pictures");
         AddFile  ("photo_001.png",   "/Pictures");
         AddFile  ("photo_002.png",   "/Pictures");
 
-        // ── Sticky Notes (Batch 7) ────────────────────────────────────────
-        // Mirrors the player's sticky notes as read-only .note files.
-        // The actual note content lives in PlayerPrefs (StickyNotesApp).
-        // These file entries are display-only stubs — opening any launches the app.
         AddFile("note_1.note",       "/Sticky Notes");
         AddFile("note_2.note",       "/Sticky Notes");
         AddFile("note_3.note",       "/Sticky Notes");
 
-        // ── Downloads ─────────────────────────────────────────────────────
         AddFile  ("installer.exe",   "/Downloads");
         AddFile  ("archive.zip",     "/Downloads");
         AddFile  ("manual.pdf",      "/Downloads");
 
-        // ── Trash ─────────────────────────────────────────────────────────
         AddFile  ("old_project.txt", "/Trash");
     }
 
@@ -143,7 +133,6 @@ public sealed class FileSystemManager : MonoBehaviour
 
     // ── Mutation API ──────────────────────────────────────────────────────
 
-    /// Create a new folder under parentPath. Returns the new entry or null if name collision.
     public FsEntry CreateFolder(string parentPath, string name)
     {
         name = SanitizeName(name);
@@ -151,10 +140,10 @@ public sealed class FileSystemManager : MonoBehaviour
         if (_entries.ContainsKey(e.fullPath)) return null;
         Register(e);
         MarkDirty();
+        NotifyChanged();   // FIX: was never called
         return e;
     }
 
-    /// Create a new file under parentPath. Returns new entry or null if collision.
     public FsEntry CreateFile(string parentPath, string name)
     {
         name = SanitizeName(name);
@@ -162,10 +151,10 @@ public sealed class FileSystemManager : MonoBehaviour
         if (_entries.ContainsKey(e.fullPath)) return null;
         Register(e);
         MarkDirty();
+        NotifyChanged();   // FIX: was never called
         return e;
     }
 
-    /// Rename an entry. Returns true on success.
     public bool Rename(string fullPath, string newName)
     {
         newName = SanitizeName(newName);
@@ -176,26 +165,22 @@ public sealed class FileSystemManager : MonoBehaviour
             ? "/" + newName
             : entry.parentPath + "/" + newName;
 
-        if (_entries.ContainsKey(newFullPath)) return false; // collision
+        if (_entries.ContainsKey(newFullPath)) return false;
 
-        // Remove old, re-register with new name
         Unregister(entry);
         entry.name     = newName;
         entry.fullPath = newFullPath;
         Register(entry);
-
-        // Recursively fix children paths
         RebuildChildPaths(fullPath, newFullPath);
         MarkDirty();
+        NotifyChanged();   // FIX: was never called
         return true;
     }
 
-    /// Delete an entry and all its descendants. Returns true on success.
     public bool Delete(string fullPath)
     {
         if (!_entries.TryGetValue(fullPath, out var entry)) return false;
 
-        // Delete descendants first
         if (_children.TryGetValue(fullPath, out var kids))
         {
             var copy = new List<FsEntry>(kids);
@@ -204,10 +189,10 @@ public sealed class FileSystemManager : MonoBehaviour
 
         Unregister(entry);
         MarkDirty();
+        NotifyChanged();   // FIX: was never called
         return true;
     }
 
-    /// Move entry to newParentPath. Returns true on success.
     public bool Move(string fullPath, string newParentPath)
     {
         if (!_entries.TryGetValue(fullPath, out var entry)) return false;
@@ -224,38 +209,35 @@ public sealed class FileSystemManager : MonoBehaviour
         entry.parentPath = newParentPath;
         entry.fullPath   = newFull;
         Register(entry);
-
         RebuildChildPaths(oldFull, newFull);
         MarkDirty();
+        NotifyChanged();   // FIX: was never called
         return true;
     }
 
     // ── Batch 7: Integration helpers ──────────────────────────────────────
 
-    /// <summary>
-    /// Creates a screenshot entry in /Pictures/Screenshots with a timestamped name.
-    /// Called by PaintApp.SaveToExplorer(). Returns the new entry or null if FS not ready.
-    /// </summary>
     public FsEntry RegisterScreenshot(string baseName)
     {
         const string folder = "/Pictures/Screenshots";
         if (!FolderExists(folder)) return null;
 
-        // Find a unique name: baseName.png, baseName_1.png, baseName_2.png ...
         string name = baseName + ".png";
         int n = 1;
         while (Exists(folder + "/" + name))
             name = baseName + "_" + (n++) + ".png";
 
+        // CreateFile already calls NotifyChanged internally
         return CreateFile(folder, name);
     }
 
     private void MarkDirty()
     {
-        _dirty    = true;
-        // Don't reset _dirtySince here — keep the first-dirty timestamp
-        // so the debounce counts from when mutations *started*, not most recent.
+        _dirty = true;
+        // Don't reset _dirtySince — keep the first-dirty timestamp
     }
+
+    private void NotifyChanged() => OnChanged?.Invoke();
 
     private void SaveToPrefs()
     {
@@ -270,18 +252,13 @@ public sealed class FileSystemManager : MonoBehaviour
             });
         PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(envelope));
         PlayerPrefs.Save();
-        _dirty     = false;
+        _dirty      = false;
         _dirtySince = float.MaxValue;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         UnityEngine.Debug.Log($"[FileExplorer] Saved {envelope.entries.Count} entries to PlayerPrefs.");
 #endif
     }
 
-    /// <summary>
-    /// Load saved filesystem from PlayerPrefs.
-    /// Returns true if a valid save was found and applied.
-    /// Returns false if no save exists (caller should call BuildVirtualFS).
-    /// </summary>
     private bool LoadFromPrefs()
     {
         string json = PlayerPrefs.GetString(SaveKey, "");
@@ -297,8 +274,6 @@ public sealed class FileSystemManager : MonoBehaviour
                 var entry = new FsEntry(e.name,
                     e.isFolder ? EntryType.Folder : EntryType.File,
                     e.parentPath);
-                // Override the auto-computed fullPath with the saved one
-                // (in case SanitizeName or path logic changes between versions)
                 entry.fullPath = e.fullPath;
                 _entries[entry.fullPath] = entry;
                 if (!_children.ContainsKey(entry.parentPath))
@@ -348,7 +323,7 @@ public sealed class FileSystemManager : MonoBehaviour
         foreach (var child in copy)
         {
             _entries.Remove(child.fullPath);
-            string oldFull  = child.fullPath;
+            string oldFull   = child.fullPath;
             child.parentPath = newParent;
             child.fullPath   = newParent + "/" + child.name;
             Register(child);

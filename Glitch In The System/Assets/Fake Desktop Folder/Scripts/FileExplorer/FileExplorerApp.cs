@@ -2,17 +2,17 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
-/// File Explorer — Batches 1–7.
-/// Audit fixes applied:
-///   - EnsureContentLayout() guarded — only runs once, not every navigation
-///   - FsContextMenu.Init() guarded — panel built once, not every OnEnable
-///   - Path breadcrumb display fixed — leading separator stripped correctly
-///   - EmptyLabel moved outside FileContent (ContentSizeFitter) so it always shows
-///   - BuildSidebar guard improved
-///   - SidebarFolderButton listener safety (RemoveAllListeners before Add)
+/// File Explorer — Batches 1–7 + Upgrade patch.
+/// Upgrade additions:
+///   - Copy/Paste: Ctrl+C snapshots entry data (deep copy struct), Ctrl+V pastes true duplicate
+///   - Drag-drop move: drop file/folder onto a folder row to move it (FsItemView)
+///   - Sidebar drag: SidebarFolderButton now supports drag-drop between sidebar roots
+///   - Refresh button: scene-placed RefreshButton wired via Inspector [SerializeField]
+///   - OnFsChanged now fires correctly (FileSystemManager.NotifyChanged fixed)
 /// </summary>
 public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 {
@@ -28,6 +28,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Sprite folderIcon;
     [SerializeField] private Sprite fileIcon;
 
+    [Header("Refresh Button (scene-placed, Inspector-editable)")]
+    [Tooltip("Wire the RefreshButton scene object here. Must be in TopBar or NavigationBar.")]
+    [SerializeField] private Button refreshButton;
+
     // ── Sub-systems ───────────────────────────────────────────────────────
     private FsContextMenu   _contextMenu;
     private FsRenameOverlay _renameOverlay;
@@ -38,19 +42,26 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     private readonly List<SidebarFolderButton> _sidebarBtns = new();
 
     // ── Content ───────────────────────────────────────────────────────────
-    private readonly List<FsItemView> _items        = new();
-    private FsItemView                _selectedItem;
-    private bool                      _contentLayoutReady;
-    // Pre-allocated: avoids new List + closure allocs on every right-click
+    private readonly List<FsItemView>              _items    = new();
+    private FsItemView                             _selectedItem;
+    private bool                                   _contentLayoutReady;
     private readonly List<(string, System.Action)> _menuItems = new(6);
-    // Item row pool — rows are reused across navigations, never destroyed unless window closes
-    private readonly List<FsItemView> _rowPool = new(32); // FIX: guard EnsureContentLayout
+    private readonly List<FsItemView>              _rowPool   = new(32);
+
+    // ── Copy/Paste clipboard (deep-copy snapshot, NOT a live reference) ───
+    // Stores a value-type snapshot so renamed/deleted originals don't corrupt paste.
+    private struct ClipboardSnapshot
+    {
+        public string                         name;
+        public FileSystemManager.EntryType    type;
+        public string                         parentPath;
+        // Extendable: add metadata fields here as the FS grows
+    }
+    private ClipboardSnapshot? _clipboard;   // null = nothing copied
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
     private void Awake() => EnsureAwakeInit();
 
-    // Extracted so OnEnable can call it if Awake was skipped (GO inactive at scene load).
-    // Guarded by null-checks — safe to call multiple times; all allocations happen only once.
     private void EnsureAwakeInit()
     {
         if (_contextMenu == null)
@@ -73,29 +84,104 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
         EnsurePathText();
         EnsureContentLayout();
+        WireRefreshButton();
     }
 
     private void OnEnable()
     {
-        // Guard: if Awake was skipped because GO was inactive at scene load,
-        // self-initialise now. All sub-allocations are guarded so this is idempotent.
+        if (FileSystemManager.Instance != null)
+            FileSystemManager.Instance.OnChanged += OnFsChanged;
+
         EnsureAwakeInit();
 
         var canvas = GetComponentInParent<Canvas>();
-
-        // FIX: Init is now guarded inside FsContextMenu — safe to call every OnEnable
         if (_contextMenu != null) _contextMenu.Init(canvas);
 
-        // FIX: RemoveAllListeners before re-wiring (prevents stacking on re-enable)
         if (backButton    != null) { backButton.onClick.RemoveAllListeners();    backButton.onClick.AddListener(GoBack);    }
         if (forwardButton != null) { forwardButton.onClick.RemoveAllListeners(); forwardButton.onClick.AddListener(GoForward); }
 
-        // FIX: rebuild sidebar if it was destroyed or never built
         if (_sidebarBtns.Count == 0 || (sidebarContent != null && sidebarContent.childCount == 0))
             BuildSidebar();
 
         if (_histIdx < 0) NavigateTo("/Desktop");
         else              RefreshUI();
+    }
+
+    private void OnDisable()
+    {
+        if (FileSystemManager.Instance != null)
+            FileSystemManager.Instance.OnChanged -= OnFsChanged;
+    }
+
+    private void OnFsChanged()
+    {
+        if (gameObject.activeInHierarchy)
+            PopulateContent(CurrentPath);
+    }
+
+    // ── Keyboard: Copy / Paste ────────────────────────────────────────────
+    private void Update()
+    {
+        if (!gameObject.activeInHierarchy) return;
+        var kb = Keyboard.current;
+        if (kb == null) return;
+
+        bool ctrl = kb.leftCtrlKey.isPressed || kb.rightCtrlKey.isPressed;
+        if (!ctrl) return;
+
+        if (kb.cKey.wasPressedThisFrame)      CopySelected();
+        else if (kb.vKey.wasPressedThisFrame) PasteClipboard();
+    }
+
+    // FIX: deep-copy snapshot — stores primitive fields, not a reference to the live FsEntry object.
+    // If the original is later renamed or deleted, the clipboard is unaffected.
+    private void CopySelected()
+    {
+        if (_selectedItem == null) return;
+        var e = _selectedItem.Entry;
+        _clipboard = new ClipboardSnapshot
+        {
+            name       = e.name,
+            type       = e.type,
+            parentPath = e.parentPath,
+        };
+        Debug.Log($"[FileExplorer] Copied (snapshot): name={e.name} type={e.type}");
+    }
+
+    // FIX: paste creates a truly new entry using snapshotted name, never the original reference.
+    // Unique name suffix ensures no collision even if paste is repeated.
+    private void PasteClipboard()
+    {
+        if (_clipboard == null) return;
+
+        var snap = _clipboard.Value;
+        var fs   = FileSystemManager.Instance;
+        if (fs == null) return;
+
+        if (snap.type == FileSystemManager.EntryType.Folder)
+        {
+            // Folder deep-copy would require recursive clone — deferred, log for now
+            Debug.Log("[FileExplorer] Paste: folder copy not yet supported.");
+            return;
+        }
+
+        // Build unique name: "file (Copy).txt", "file (Copy 2).txt", …
+        string baseName = snap.name;
+        string ext      = "";
+        int dotIdx      = baseName.LastIndexOf('.');
+        if (dotIdx > 0) { ext = baseName.Substring(dotIdx); baseName = baseName.Substring(0, dotIdx); }
+
+        string candidate = baseName + " (Copy)" + ext;
+        int n = 2;
+        while (fs.Exists(CurrentPath + "/" + candidate))
+            candidate = baseName + $" (Copy {n++})" + ext;
+
+        // CreateFile creates a brand-new FsEntry with a unique fullPath — true duplication
+        var newEntry = fs.CreateFile(CurrentPath, candidate);
+        if (newEntry != null)
+            Debug.Log($"[FileExplorer] Pasted new entry: {newEntry.fullPath}");
+        else
+            Debug.LogWarning($"[FileExplorer] Paste failed — could not create '{candidate}' in '{CurrentPath}'");
     }
 
     // ── Navigation API ────────────────────────────────────────────────────
@@ -134,7 +220,6 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         var entry = fs.CreateFolder(CurrentPath, name);
         if (entry == null) return;
 
-        PopulateContent(CurrentPath);
         var view = _items.Find(i => i.Entry.fullPath == entry.fullPath);
         if (view != null) BeginRename(view);
     }
@@ -145,15 +230,19 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         var fs = FileSystemManager.Instance;
         if (fs == null) return;
 
-        string path = _selectedItem.Entry.fullPath;
-        fs.Delete(path);
+        // Invalidate clipboard if the copied item is being deleted
+        if (_clipboard != null &&
+            _clipboard.Value.name == _selectedItem.Entry.name &&
+            _clipboard.Value.parentPath == _selectedItem.Entry.parentPath)
+            _clipboard = null;
+
+        fs.Delete(_selectedItem.Entry.fullPath);
         _selectedItem = null;
-        PopulateContent(CurrentPath);
     }
 
     public void BeginRename(FsItemView view)
     {
-        Debug.Log($"[Rename] BeginRename called. view={view?.name ?? "NULL"} entry={view?.Entry.name ?? "NULL"} _renameOverlay={(_renameOverlay == null ? "NULL" : (_renameOverlay.gameObject == null ? "DESTROYED" : _renameOverlay.name))}");
+        Debug.Log($"[Rename] BeginRename view={view?.name ?? "NULL"} entry={view?.Entry.name ?? "NULL"}");
         if (view == null) return;
         _renameOverlay.Show(
             view.GetComponent<RectTransform>(),
@@ -162,7 +251,6 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             {
                 var fs = FileSystemManager.Instance;
                 if (fs != null) fs.Rename(view.Entry.fullPath, newName);
-                PopulateContent(CurrentPath);
             },
             () => { /* cancelled */ }
         );
@@ -175,7 +263,22 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (fs == null) return;
         fs.Move(_selectedItem.Entry.fullPath, targetFolderPath);
         _selectedItem = null;
-        PopulateContent(CurrentPath);
+    }
+
+    // ── Drag & drop acceptance (content area) ─────────────────────────────
+    private void OnItemReceivedDrop(FsItemView target, FsItemView dragged)
+    {
+        if (target == null || dragged == null) return;
+        if (target.Entry.type != FileSystemManager.EntryType.Folder) return;
+
+        var fs = FileSystemManager.Instance;
+        if (fs == null) return;
+
+        bool ok = fs.Move(dragged.Entry.fullPath, target.Entry.fullPath);
+        if (!ok)
+            Debug.LogWarning($"[FileExplorer] Move failed: {dragged.Entry.fullPath} → {target.Entry.fullPath}");
+
+        if (_selectedItem == dragged) _selectedItem = null;
     }
 
     // ── Context menu ──────────────────────────────────────────────────────
@@ -198,6 +301,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     {
         _menuItems.Clear();
         _menuItems.Add(("New Folder", () => CreateFolder()));
+        _menuItems.Add(("Paste",      () => PasteClipboard()));
         _contextMenu.ShowAt(screenPos, _menuItems);
     }
 
@@ -208,29 +312,61 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         ShowBackgroundContextMenu(e.position);
     }
 
+    // ── Refresh ───────────────────────────────────────────────────────────
+    public void Refresh() => PopulateContent(CurrentPath);
+
+    // ── Sidebar drag-drop: called by SidebarFolderButton ──────────────────
+    /// <summary>
+    /// Called when a sidebar button receives a drop from another sidebar button.
+    /// Moves the dragged folder under the target folder.
+    /// Guards: cannot move into self, cannot move into a descendant.
+    /// </summary>
+    public void OnSidebarDrop(string draggedPath, string targetPath)
+    {
+        if (string.IsNullOrEmpty(draggedPath) || string.IsNullOrEmpty(targetPath)) return;
+        if (draggedPath == targetPath) return;
+
+        // Prevent moving into own descendant (circular parenting)
+        if (targetPath.StartsWith(draggedPath + "/", System.StringComparison.Ordinal))
+        {
+            Debug.LogWarning($"[FileExplorer] Sidebar move blocked: cannot move '{draggedPath}' into its own descendant '{targetPath}'");
+            return;
+        }
+
+        var fs = FileSystemManager.Instance;
+        if (fs == null) return;
+
+        bool ok = fs.Move(draggedPath, targetPath);
+        if (ok)
+        {
+            // Sidebar roots list is static — rebuild sidebar to reflect new hierarchy
+            BuildSidebar();
+            Debug.Log($"[FileExplorer] Sidebar move: '{draggedPath}' → '{targetPath}'");
+        }
+        else
+            Debug.LogWarning($"[FileExplorer] Sidebar move failed: '{draggedPath}' → '{targetPath}'");
+    }
+
     // ── Refresh / populate ────────────────────────────────────────────────
     private void RefreshUI()
     {
         string path = CurrentPath;
 
-        // FIX: correct breadcrumb — strip leading separator then replace remaining
         if (pathText != null)
         {
             if (string.IsNullOrEmpty(path))
                 pathText.text = "File Explorer";
             else
             {
-                // "/Desktop" → "Desktop"
-                // "/Documents/Work" → "Documents  ›  Work"
                 string display = path.TrimStart('/').Replace("/", "  ›  ");
                 pathText.text = string.IsNullOrEmpty(display) ? "File Explorer" : display;
             }
         }
 
-        if (backButton    != null)
+        if (backButton != null)
         {
             backButton.interactable = _histIdx > 0;
-            SetButtonLabelAlpha(backButton,    _histIdx > 0);
+            SetButtonLabelAlpha(backButton, _histIdx > 0);
         }
         if (forwardButton != null)
         {
@@ -238,7 +374,6 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             SetButtonLabelAlpha(forwardButton, _histIdx < _history.Count - 1);
         }
 
-        // Sync sidebar selection
         foreach (var btn in _sidebarBtns)
             btn.SetSelected(btn.name == "SidebarBtn_" + path);
 
@@ -247,11 +382,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     private void PopulateContent(string path)
     {
-        // Deactivate all active items back into pool — no Destroy calls.
         foreach (var item in _items)
-        {
             if (item != null) item.gameObject.SetActive(false);
-        }
         _items.Clear();
         _selectedItem = null;
 
@@ -273,42 +405,35 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         foreach (var entry in children)
         {
             FsItemView view;
-            // Find next available pool slot (inactive rows not in _items)
             while (poolIdx < _rowPool.Count && _rowPool[poolIdx].gameObject.activeSelf)
                 poolIdx++;
 
             if (poolIdx < _rowPool.Count)
             {
-                // Reuse pooled row
                 view = _rowPool[poolIdx];
                 Color iconColor = GetIconColor(entry);
                 view.Rebind(entry, folderIcon, fileIcon, iconColor);
-                // Re-wire callbacks (may point to stale closures from previous navigation)
-                view.OnSingleClick = OnItemSingleClick;
-                view.OnDoubleClick = OnItemDoubleClick;
-                view.OnRightClick  = (v, pos) => { OnItemSingleClick(v); ShowItemContextMenu(v, pos); };
+                view.OnSingleClick  = OnItemSingleClick;
+                view.OnDoubleClick  = OnItemDoubleClick;
+                view.OnRightClick   = (v, pos) => { OnItemSingleClick(v); ShowItemContextMenu(v, pos); };
+                view.OnReceivedDrop = OnItemReceivedDrop;
                 view.gameObject.SetActive(true);
-                // Ensure correct sibling order in VLG
                 view.transform.SetAsLastSibling();
                 poolIdx++;
             }
             else
             {
-                // Pool exhausted — build a new row and register it
                 view = BuildItemRow(entry);
                 _rowPool.Add(view);
             }
 
-            // Also update Type label (column 3 child of the row GO)
             UpdateTypeLabel(view, entry);
             _items.Add(view);
         }
     }
 
-    // Updates the Type column TMP on a pooled or newly built row.
     private static void UpdateTypeLabel(FsItemView view, FileSystemManager.FsEntry entry)
     {
-        // Type label is the 3rd child of the row GO (index 2: Icon=0, Name=1, Type=2)
         var t = view.transform;
         if (t.childCount < 3) return;
         var typeTMP = t.GetChild(2).GetComponent<TMPro.TextMeshProUGUI>();
@@ -325,17 +450,15 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         return new Color(0.65f, 0.67f, 0.72f, 1f);
     }
 
-    // FIX: run once (guarded by _contentLayoutReady), not every PopulateContent call
     private void EnsureContentLayout()
     {
         if (_contentLayoutReady || fileContent == null) return;
         _contentLayoutReady = true;
 
-        // FileContent VLG — reduced outer padding since item rows have inner padding
         var vlg = fileContent.GetComponent<VerticalLayoutGroup>();
         if (vlg == null) vlg = fileContent.gameObject.AddComponent<VerticalLayoutGroup>();
-        vlg.padding              = new RectOffset(4, 4, 4, 4); // was L8R8 — reduced to avoid double-padding
-        vlg.spacing              = 1;                           // was 2 — tighter, more Windows-like
+        vlg.padding              = new RectOffset(4, 4, 4, 4);
+        vlg.spacing              = 1;
         vlg.childControlWidth    = true;
         vlg.childControlHeight   = true;
         vlg.childForceExpandWidth  = true;
@@ -345,55 +468,42 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (csf == null) csf = fileContent.gameObject.AddComponent<ContentSizeFitter>();
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        // Zero out initial stale sizeDelta
         fileContent.sizeDelta = new Vector2(fileContent.sizeDelta.x, 0f);
     }
 
     private FsItemView BuildItemRow(FileSystemManager.FsEntry entry)
     {
-        bool isFolder = entry.type == FileSystemManager.EntryType.Folder;
-
         var go = new GameObject("FsItem_" + entry.name,
             typeof(RectTransform), typeof(CanvasRenderer),
             typeof(Image), typeof(Button), typeof(FsItemView));
         go.transform.SetParent(fileContent, false);
-
-        go.AddComponent<LayoutElement>().preferredHeight = 32f; // was 36 — tighter, more Windows-like
+        go.AddComponent<LayoutElement>().preferredHeight = 32f;
 
         var bgImg = go.GetComponent<Image>();
         bgImg.color = new Color(1f, 1f, 1f, 0f);
         bgImg.raycastTarget = true;
 
         var hlg = go.AddComponent<HorizontalLayoutGroup>();
-        hlg.padding        = new RectOffset(6, 8, 0, 0); // was L8R8T4B4 — reduced (VLG outer handles vertical)
-        hlg.spacing        = 6;                            // was 8
+        hlg.padding        = new RectOffset(6, 8, 0, 0);
+        hlg.spacing        = 6;
         hlg.childAlignment = TextAnchor.MiddleLeft;
         hlg.childControlWidth      = false;
         hlg.childControlHeight     = true;
         hlg.childForceExpandWidth  = false;
         hlg.childForceExpandHeight = true;
 
-        // Icon — colored square (placeholder for real sprites)
         var iconGO = new GameObject("Icon",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         iconGO.transform.SetParent(go.transform, false);
-        var iconLE  = iconGO.AddComponent<LayoutElement>();
-        iconLE.preferredWidth  = 16f; // was 20 — tighter
+        var iconLE = iconGO.AddComponent<LayoutElement>();
+        iconLE.preferredWidth  = 16f;
         iconLE.preferredHeight = 16f;
         var iconImg = iconGO.GetComponent<Image>();
-
-        if (!isFolder && entry.name.EndsWith(".lnk", System.StringComparison.OrdinalIgnoreCase))
-            iconImg.color = new Color(0.55f, 0.80f, 1.00f, 1f);
-        else if (isFolder)
-            iconImg.color = new Color(0.96f, 0.76f, 0.26f, 1f);
-        else
-            iconImg.color = new Color(0.65f, 0.67f, 0.72f, 1f);
-
+        iconImg.color = GetIconColor(entry);
         iconImg.raycastTarget = false;
-        if (isFolder && folderIcon != null) { iconImg.sprite = folderIcon; iconImg.color = Color.white; }
-        if (!isFolder && fileIcon  != null) { iconImg.sprite = fileIcon;   iconImg.color = Color.white; }
+        if (entry.type == FileSystemManager.EntryType.Folder && folderIcon != null) { iconImg.sprite = folderIcon; iconImg.color = Color.white; }
+        if (entry.type == FileSystemManager.EntryType.File   && fileIcon   != null) { iconImg.sprite = fileIcon;   iconImg.color = Color.white; }
 
-        // Name
         var lblGO = new GameObject("Name",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         lblGO.transform.SetParent(go.transform, false);
@@ -406,11 +516,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         tmp.overflowMode  = TextOverflowModes.Ellipsis;
         tmp.raycastTarget = false;
 
-        // Type column — right-aligned, dimmer
         var typeGO = new GameObject("Type",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         typeGO.transform.SetParent(go.transform, false);
-        typeGO.AddComponent<LayoutElement>().preferredWidth = 64f; // was 70
+        typeGO.AddComponent<LayoutElement>().preferredWidth = 64f;
         var typeTMP = typeGO.GetComponent<TextMeshProUGUI>();
         typeTMP.text          = GetTypeLabel(entry);
         typeTMP.fontSize      = 11;
@@ -421,9 +530,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         var view = go.GetComponent<FsItemView>();
         view.SetRefs(bgImg, iconImg, tmp);
         view.Init(entry, folderIcon, fileIcon);
-        view.OnSingleClick = OnItemSingleClick;
-        view.OnDoubleClick = OnItemDoubleClick;
-        view.OnRightClick  = (v, pos) => { OnItemSingleClick(v); ShowItemContextMenu(v, pos); };
+        view.OnSingleClick  = OnItemSingleClick;
+        view.OnDoubleClick  = OnItemDoubleClick;
+        view.OnRightClick   = (v, pos) => { OnItemSingleClick(v); ShowItemContextMenu(v, pos); };
+        view.OnReceivedDrop = OnItemReceivedDrop;
 
         return view;
     }
@@ -476,7 +586,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         var vlg = sidebarContent.GetComponent<VerticalLayoutGroup>();
         if (vlg == null) vlg = sidebarContent.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.padding              = new RectOffset(4, 4, 8, 4);
-        vlg.spacing              = 1; // was 2
+        vlg.spacing              = 1;
         vlg.childControlWidth    = true;
         vlg.childControlHeight   = true;
         vlg.childForceExpandWidth  = true;
@@ -496,14 +606,14 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             typeof(RectTransform), typeof(CanvasRenderer),
             typeof(Image), typeof(Button), typeof(SidebarFolderButton));
         go.transform.SetParent(sidebarContent, false);
-        go.AddComponent<LayoutElement>().preferredHeight = 30f; // was 32 — tighter
+        go.AddComponent<LayoutElement>().preferredHeight = 30f;
 
         var bgImg = go.GetComponent<Image>();
         bgImg.color = new Color(1f, 1f, 1f, 0f);
         bgImg.raycastTarget = true;
 
         var hlg = go.AddComponent<HorizontalLayoutGroup>();
-        hlg.padding        = new RectOffset(10, 8, 0, 0); // indent label from left edge
+        hlg.padding        = new RectOffset(10, 8, 0, 0);
         hlg.spacing        = 6;
         hlg.childAlignment = TextAnchor.MiddleLeft;
         hlg.childControlWidth      = false;
@@ -516,10 +626,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         lblGO.transform.SetParent(go.transform, false);
         lblGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
         var tmp = lblGO.GetComponent<TextMeshProUGUI>();
-        tmp.text         = displayName;
-        tmp.fontSize     = 12;
-        tmp.color        = new Color(0.80f, 0.78f, 0.75f, 1f); // slightly dimmer than content text
-        tmp.alignment    = TextAlignmentOptions.MidlineLeft;
+        tmp.text          = displayName;
+        tmp.fontSize      = 12;
+        tmp.color         = new Color(0.80f, 0.78f, 0.75f, 1f);
+        tmp.alignment     = TextAlignmentOptions.MidlineLeft;
         tmp.raycastTarget = false;
         tmp.overflowMode  = TextOverflowModes.Ellipsis;
 
@@ -546,10 +656,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         lblGO.transform.SetParent(pathBar, false);
 
         var rt = lblGO.GetComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(8f,  2f);
-        rt.offsetMax = new Vector2(-8f, -2f);
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(8f,  2f); rt.offsetMax = new Vector2(-8f, -2f);
 
         pathText              = lblGO.GetComponent<TextMeshProUGUI>();
         pathText.fontSize     = 12;
@@ -560,7 +668,18 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         pathText.text          = "File Explorer";
     }
 
-    // Dims button label TMP when button is non-interactable — makes disabled state visible.
+    // ── Refresh button ────────────────────────────────────────────────────
+    // Scene-placed RefreshButton wired via [SerializeField] refreshButton.
+    // WireRefreshButton() only adds the listener — it does NOT create a new button.
+    // The scene object is the source of truth; sprite, size, color are editable in Inspector.
+    private void WireRefreshButton()
+    {
+        if (refreshButton == null) return;
+        refreshButton.onClick.RemoveAllListeners();
+        refreshButton.onClick.AddListener(Refresh);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
     private static void SetButtonLabelAlpha(Button btn, bool active)
     {
         if (btn == null) return;
