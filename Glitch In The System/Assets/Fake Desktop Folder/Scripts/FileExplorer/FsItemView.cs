@@ -16,6 +16,7 @@ public sealed class FsItemView : MonoBehaviour,
 {
     [SerializeField] private Image           iconImage;
     [SerializeField] private TextMeshProUGUI nameLabel;
+    [SerializeField] private TextMeshProUGUI typeLabel;  // cached — avoids GetChild(2).GetComponent per PopulateContent
     [SerializeField] private Image           background;
 
     private FileSystemManager.FsEntry _entry;
@@ -97,12 +98,16 @@ public sealed class FsItemView : MonoBehaviour,
 
     public FileSystemManager.FsEntry Entry => _entry;
 
-    public void SetRefs(Image bg, Image icon, TextMeshProUGUI label)
+    public void SetRefs(Image bg, Image icon, TextMeshProUGUI label, TextMeshProUGUI typeLbl = null)
     {
         background = bg;
         iconImage  = icon;
         nameLabel  = label;
+        typeLabel  = typeLbl;
     }
+
+    /// <summary>Update the type column label. Uses cached typeLabel — no GetComponent.</summary>
+    public void SetTypeLabel(string text) { if (typeLabel != null) typeLabel.text = text; }
 
     // ── Click handling ────────────────────────────────────────────────────
     public void OnPointerDown(PointerEventData e) { /* required by IPointerDownHandler to receive drag events */ }

@@ -145,7 +145,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             type       = e.type,
             parentPath = e.parentPath,
         };
-        Debug.Log($"[FileExplorer] Copied (snapshot): name={e.name} type={e.type}");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"[FileExplorer] Copied: {e.name} ({e.type})");
+#endif
     }
 
     // FIX: paste creates a truly new entry using snapshotted name, never the original reference.
@@ -161,7 +163,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (snap.type == FileSystemManager.EntryType.Folder)
         {
             // Folder deep-copy would require recursive clone — deferred, log for now
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("[FileExplorer] Paste: folder copy not yet supported.");
+#endif
             return;
         }
 
@@ -178,10 +182,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
         // CreateFile creates a brand-new FsEntry with a unique fullPath — true duplication
         var newEntry = fs.CreateFile(CurrentPath, candidate);
-        if (newEntry != null)
-            Debug.Log($"[FileExplorer] Pasted new entry: {newEntry.fullPath}");
-        else
-            Debug.LogWarning($"[FileExplorer] Paste failed — could not create '{candidate}' in '{CurrentPath}'");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (newEntry != null) Debug.Log($"[FileExplorer] Pasted: {newEntry.fullPath}");
+        else Debug.LogWarning($"[FileExplorer] Paste failed: '{candidate}' in '{CurrentPath}'");
+#endif
     }
 
     // ── Navigation API ────────────────────────────────────────────────────
@@ -242,7 +246,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     public void BeginRename(FsItemView view)
     {
-        Debug.Log($"[Rename] BeginRename view={view?.name ?? "NULL"} entry={view?.Entry.name ?? "NULL"}");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"[Rename] BeginRename: {view?.Entry.name ?? "NULL"}");
+#endif
         if (view == null) return;
         _renameOverlay.Show(
             view.GetComponent<RectTransform>(),
@@ -275,8 +281,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (fs == null) return;
 
         bool ok = fs.Move(dragged.Entry.fullPath, target.Entry.fullPath);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (!ok)
             Debug.LogWarning($"[FileExplorer] Move failed: {dragged.Entry.fullPath} → {target.Entry.fullPath}");
+#endif
 
         if (_selectedItem == dragged) _selectedItem = null;
     }
@@ -332,7 +340,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         // Prevent moving into own descendant (circular parenting)
         if (targetPath.StartsWith(draggedPath + "/", System.StringComparison.Ordinal))
         {
-            Debug.LogWarning($"[FileExplorer] Sidebar move blocked: cannot move '{draggedPath}' into its own descendant '{targetPath}'");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.LogWarning($"[FileExplorer] Sidebar move blocked: '{draggedPath}' → '{targetPath}'");
+#endif
             return;
         }
 
@@ -344,10 +354,14 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         {
             // Sidebar roots list is static — rebuild sidebar to reflect new hierarchy
             BuildSidebar();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[FileExplorer] Sidebar move: '{draggedPath}' → '{targetPath}'");
+#endif
         }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         else
             Debug.LogWarning($"[FileExplorer] Sidebar move failed: '{draggedPath}' → '{targetPath}'");
+#endif
     }
 
     // ── Refresh / populate ────────────────────────────────────────────────
@@ -437,10 +451,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     private static void UpdateTypeLabel(FsItemView view, FileSystemManager.FsEntry entry)
     {
-        var t = view.transform;
-        if (t.childCount < 3) return;
-        var typeTMP = t.GetChild(2).GetComponent<TMPro.TextMeshProUGUI>();
-        if (typeTMP != null) typeTMP.text = GetTypeLabel(entry);
+        // Uses FsItemView.SetTypeLabel — cached reference, no GetChild/GetComponent.
+        view.SetTypeLabel(GetTypeLabel(entry));
     }
 
     private static Color GetIconColor(FileSystemManager.FsEntry entry)
@@ -531,7 +543,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         typeTMP.raycastTarget = false;
 
         var view = go.GetComponent<FsItemView>();
-        view.SetRefs(bgImg, iconImg, tmp);
+        view.SetRefs(bgImg, iconImg, tmp, typeTMP); // cache typeLabel — eliminates GetChild(2).GetComponent per PopulateContent
         view.Init(entry, folderIcon, fileIcon);
         view.OnSingleClick  = OnItemSingleClick;
         view.OnDoubleClick  = OnItemDoubleClick;

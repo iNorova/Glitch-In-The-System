@@ -43,6 +43,14 @@ public sealed class PaintApp : MonoBehaviour,
     // Re-allocated in ResizeCanvas() when the canvas grows, matching the _visited pattern.
     private Color32[] _whitePixels;
 
+    // PERF: CPU-side pixel buffer — mirrors texture data.
+    // PaintCircle writes into this array (array index write, no P/Invoke).
+    // _tex.SetPixels32(_pixels32) + Apply() is called ONCE per drag event
+    // instead of one SetPixel() P/Invoke call per pixel.
+    // Kept in sync with canvas size in ResizeCanvas().
+    private Color32[] _pixels32;
+    private Color32   _paintColor32; // cached, updated when color/tool changes
+
     private const int InitialTexW    = 740;
     private const int InitialTexH    = 460;
     private const int BrushRadius    = 4;
@@ -68,6 +76,13 @@ public sealed class PaintApp : MonoBehaviour,
         _whitePixels = new Color32[_texW * _texH];
         for (int i = 0; i < _whitePixels.Length; i++)
             _whitePixels[i] = new Color32(255, 255, 255, 255);
+
+        // PERF: initialise CPU pixel buffer — sized to match texture.
+        _pixels32 = new Color32[_texW * _texH];
+        for (int i = 0; i < _pixels32.Length; i++)
+            _pixels32[i] = new Color32(255, 255, 255, 255);
+
+        _paintColor32 = (Color32)_currentColor;
 
         _tex = new Texture2D(_texW, _texH, TextureFormat.RGBA32, false);
         _tex.filterMode = FilterMode.Point;
@@ -138,14 +153,19 @@ public sealed class PaintApp : MonoBehaviour,
                 _whitePixels[i] = new Color32(255, 255, 255, 255);
         }
 
+        // ── Resize _pixels32 buffer and copy existing pixel data ─────────────
+        // After texture swap, pull current pixels so the CPU buffer stays in sync.
+        _pixels32 = newTex.GetPixels32();
+        // (newTex already has the merged content from SetPixels32+Apply above)
+
         // ── Reassign texture to RawImage ─────────────────────────────────────
         if (drawingCanvas != null)
             drawingCanvas.texture = _tex;
     }
 
     // ── Tool switching ────────────────────────────────────────────────────────
-    public void SetToolPencil() { _isErasing = false; _isFilling = false; }
-    public void SetToolEraser() { _isErasing = true;  _isFilling = false; }
+    public void SetToolPencil() { _isErasing = false; _isFilling = false; _paintColor32 = (Color32)_currentColor; }
+    public void SetToolEraser() { _isErasing = true;  _isFilling = false; _paintColor32 = new Color32(255, 255, 255, 255); }
     public void SetToolFill()   { _isErasing = false; _isFilling = true;  }
 
     // ── Color palette ─────────────────────────────────────────────────────────
@@ -164,6 +184,7 @@ public sealed class PaintApp : MonoBehaviour,
         _currentColor = PaletteColors[index].color;
         _isErasing    = false;
         _isFilling    = false;
+        _paintColor32 = (Color32)_currentColor;
         if (colorPalettePanel != null) colorPalettePanel.SetActive(false);
     }
 
@@ -174,7 +195,7 @@ public sealed class PaintApp : MonoBehaviour,
     public void SetColorBlue()   => SelectColor(3);
     public void SetColorGreen()  => SelectColor(4);
     public void SetColorYellow() => SelectColor(5);
-    public void SetColor(Color c){ _isFilling = false; _isErasing = false; _currentColor = c; }
+    public void SetColor(Color c){ _isFilling = false; _isErasing = false; _currentColor = c; _paintColor32 = (Color32)c; }
 
     // ── Clear ─────────────────────────────────────────────────────────────────
     public void ClearCanvas() => ClearToWhite();
@@ -223,7 +244,7 @@ public sealed class PaintApp : MonoBehaviour,
         _isPainting = true;
         _lastPixel  = px;
         PaintCircle(px);
-        _tex.Apply();
+        FlushPixels(); // one SetPixels32 + Apply for all circles this event
     }
 
     public void OnDrag(PointerEventData e)
@@ -232,10 +253,23 @@ public sealed class PaintApp : MonoBehaviour,
         var px = PointerToPixel(e);
         PaintLine(_lastPixel, px);
         _lastPixel = px;
-        _tex.Apply();
+        FlushPixels(); // one SetPixels32 + Apply for all circles this drag event
     }
 
     public void OnPointerUp(PointerEventData e) => _isPainting = false;
+
+    // ── Pixel buffer flush ────────────────────────────────────────────────────
+    /// <summary>
+    /// Uploads the CPU pixel buffer to the GPU in one call.
+    /// Called once per pointer/drag event — never inside a loop.
+    /// </summary>
+    [System.Runtime.CompilerServices.MethodImpl(
+        System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private void FlushPixels()
+    {
+        _tex.SetPixels32(_pixels32);
+        _tex.Apply(false); // false = don't recalculate mipmaps (we have none)
+    }
 
     // ── Flood fill (scanline) ─────────────────────────────────────────────────
     private void FloodFill(Vector2 pixel)
@@ -287,8 +321,10 @@ public sealed class PaintApp : MonoBehaviour,
         for (int i = 0; i < pixels.Length; i++)
             if (_visited[i]) { _visited[i] = false; }
 
-        _tex.SetPixels32(pixels);
-        _tex.Apply();
+        // Sync CPU buffer so subsequent stroke paints see the filled pixels
+        System.Array.Copy(pixels, _pixels32, pixels.Length);
+        _tex.SetPixels32(_pixels32);
+        _tex.Apply(false);
     }
 
     private void ScanRow(Color32[] pixels, int y, int x1, int x2, Color32 targetColor, int dy)
@@ -356,25 +392,37 @@ public sealed class PaintApp : MonoBehaviour,
 
     private void PaintCircle(Vector2 center)
     {
-        int cx = Mathf.RoundToInt(center.x);
-        int cy = Mathf.RoundToInt(center.y);
-        Color paintColor = _isErasing ? Color.white : _currentColor;
-        int   radius     = _isErasing ? EraserRadius : BrushRadius;
+        // PERF: write directly into the CPU-side _pixels32 buffer.
+        // No P/Invoke per pixel — array index write only.
+        // Caller is responsible for calling _tex.SetPixels32 + Apply once after
+        // all PaintCircle calls for a single drag event are done.
+        int cx     = Mathf.RoundToInt(center.x);
+        int cy     = Mathf.RoundToInt(center.y);
+        int radius = _isErasing ? EraserRadius : BrushRadius;
+        // _paintColor32 is pre-cached when tool/color changes — no Color32 cast here.
+        Color32 c  = _paintColor32;
+        int rSq    = radius * radius;
         for (int dy = -radius; dy <= radius; dy++)
-        for (int dx = -radius; dx <= radius; dx++)
         {
-            if (dx * dx + dy * dy > radius * radius) continue;
-            int px = cx + dx, py = cy + dy;
-            if (px < 0 || px >= _texW || py < 0 || py >= _texH) continue;
-            _tex.SetPixel(px, py, paintColor);
+            int py = cy + dy;
+            if (py < 0 || py >= _texH) continue;
+            int rowBase = py * _texW;
+            int dySq    = dy * dy;
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                if (dx * dx + dySq > rSq) continue;
+                int px = cx + dx;
+                if (px < 0 || px >= _texW) continue;
+                _pixels32[rowBase + px] = c;
+            }
         }
     }
 
     private void ClearToWhite()
     {
-        // PERF: reuse pre-allocated _whitePixels buffer — zero GC allocation.
-        // Buffer is initialised in Awake() and kept in sync with canvas size in ResizeCanvas().
-        _tex.SetPixels32(_whitePixels, 0);
+        // PERF: copy white pixels into both the CPU buffer and the texture in one pass.
+        System.Array.Copy(_whitePixels, _pixels32, _whitePixels.Length);
+        _tex.SetPixels32(_pixels32, 0);
         _tex.Apply();
     }
 

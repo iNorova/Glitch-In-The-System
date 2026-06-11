@@ -16,19 +16,36 @@ public sealed class SnippingToolApp : MonoBehaviour
     private SimpleAppWindow _window;
     private WindowAnimator  _animator;
     private Canvas          _canvas; // FakeDesktop canvas — passed to SnippingCapture
+    private bool            _initialized;
 
-    private void Awake()
+    private void Awake()   => EnsureInit();
+    private void OnEnable() => EnsureInit();
+
+    private void EnsureInit()
     {
+        if (_initialized) return;
+
         _window   = GetComponent<SimpleAppWindow>();
         _animator = GetComponent<WindowAnimator>();
         _canvas   = GetComponentInParent<Canvas>();
-        Debug.Log($"[SnippingToolApp] Awake — window={_window != null}  animator={_animator != null}  canvas={_canvas?.name}");
+
+        // Only mark initialized when all three are resolved — if Awake fires too
+        // early (before the hierarchy is ready), OnEnable will retry on first open.
+        if (_window == null || _animator == null || _canvas == null) return;
+
+        _initialized = true;
 
         if (closeButton != null)
+        {
+            closeButton.onClick.RemoveListener(CloseWindow);
             closeButton.onClick.AddListener(CloseWindow);
+        }
 
         if (newScreenshotButton != null)
+        {
+            newScreenshotButton.onClick.RemoveListener(OnNewScreenshot);
             newScreenshotButton.onClick.AddListener(OnNewScreenshot);
+        }
 
         if (snippingOverlay != null)
         {
