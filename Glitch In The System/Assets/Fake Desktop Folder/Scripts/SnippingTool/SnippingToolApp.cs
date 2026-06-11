@@ -27,13 +27,16 @@ public sealed class SnippingToolApp : MonoBehaviour
 
         _window   = GetComponent<SimpleAppWindow>();
         _animator = GetComponent<WindowAnimator>();
-        _canvas   = GetComponentInParent<Canvas>();
 
-        // Only mark initialized when all three are resolved — if Awake fires too
-        // early (before the hierarchy is ready), OnEnable will retry on first open.
-        if (_window == null || _animator == null || _canvas == null) return;
+        // _canvas is NOT in the guard — GetComponentInParent<Canvas>() returns null
+        // on an inactive GO. Resolve it lazily in OnSnipComplete instead.
+        // _window and _animator are on the same GO so they always resolve correctly.
+        if (_window == null || _animator == null) return;
 
         _initialized = true;
+
+        // Resolve canvas now if we're active, otherwise it's resolved on first snip.
+        _canvas = GetComponentInParent<Canvas>();
 
         if (closeButton != null)
         {
@@ -108,7 +111,8 @@ public sealed class SnippingToolApp : MonoBehaviour
     // ── Overlay callbacks ──────────────────────────────────────────────────────
     private void OnSnipComplete(Rect canvasLocalRect)
     {
-        Debug.Log($"[SnippingToolApp] OnSnipComplete — rect=({canvasLocalRect.x:F1},{canvasLocalRect.y:F1},{canvasLocalRect.width:F1},{canvasLocalRect.height:F1})  canvas={_canvas?.name}  scaleFactor={_canvas?.scaleFactor}  windowActive={gameObject.activeSelf}");
+        // Resolve canvas lazily — may have been null at init time if GO was inactive.
+        if (_canvas == null) _canvas = GetComponentInParent<Canvas>();
         // ORDER MATTERS:
         //
         // 1. RestoreWindow() FIRST:

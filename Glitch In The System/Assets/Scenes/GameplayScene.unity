@@ -13411,8 +13411,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d66ba4213c2905b4cae5e7b08710858a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SimpleAppWindow
-  windowRoot: {fileID: 0}
-  startClosed: 0
+  windowRoot: {fileID: 465742968}
+  startClosed: 1
   openActsAsToggleWhenAlreadyOpen: 1
 --- !u!114 &831544705
 MonoBehaviour:
