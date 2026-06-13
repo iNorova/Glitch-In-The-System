@@ -21,7 +21,8 @@ public sealed class FsContextMenu : MonoBehaviour
     private Canvas        _canvas;
     private RectTransform _windowRect; // for boundary clamping
     private bool          _open;
-    private bool          _panelBuilt; // guard against rebuilding on every Init() call
+    private bool          _panelBuilt;
+    private Vector2       _cursorLocal;
 
     private readonly List<(string label, Action action)> _items = new();
 
@@ -54,26 +55,27 @@ public sealed class FsContextMenu : MonoBehaviour
         _items.AddRange(menuItems);
         RebuildMenuItems();
 
-        // Convert screen → window-local space (panel's parent space).
-        // Using _windowRect (FileExplorerAppWindow) instead of the canvas root
-        // so anchoredPosition is in the same coordinate space as the window
-        // bounds used by ClampPanelToWindow. Without this, the menu spawns
-        // offset by the window's displacement from the canvas center.
+        // Convert screen position → FsContextMenu local space.
+        // _windowRect is this GO's own RT (full-stretch inside the window).
+        // Its local space has origin at the RT pivot (0.5,0.5 = centre of window).
+        // Use _panel.parent RT — the exact space _panel.anchoredPosition lives in.
+        // Using any other RT (_windowRect, canvas root, etc.) causes coordinate offset.
+        var panelParentRT = _panel.parent as RectTransform;
+        if (panelParentRT == null) return;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            _windowRect,
-            screenPos, _canvas.worldCamera, out var local);
+            panelParentRT, screenPos, _canvas.worldCamera, out var local);
 
+        // Windows-like cursor offset: open 6px right, 4px below cursor
+        // The panel anchor/pivot is (0,1) = top-left corner.
+        // In this local space: +x is right, +y is up.
+        // Cursor point is where we want the top-left of the menu to appear.
+        _cursorLocal = local;
         _panel.anchoredPosition = local;
-
-        // Backdrop behind panel — catches all outside clicks
         _backdrop.gameObject.SetActive(true);
         _panel.gameObject.SetActive(true);
-        // Bring FsContextMenu GO to top of FileExplorerAppWindow children so it
-        // renders above Body/Sidebar. Then bring panel above backdrop within it.
         transform.SetAsLastSibling();
-        _panel.SetAsLastSibling(); // panel above backdrop
+        _panel.SetAsLastSibling();
         _open = true;
-
         ClampPanelToWindow();
     }
 
@@ -97,28 +99,31 @@ public sealed class FsContextMenu : MonoBehaviour
     {
         if (_windowRect == null || _panel == null) return;
 
-        // Compute panel height analytically instead of calling Canvas.ForceUpdateCanvases().
-        // ForceUpdateCanvases flushes the ENTIRE canvas layout tree synchronously — 2-8ms
-        // spike on every right-click. The panel size is fully predictable from item count.
         float panelHeight = PanelPadding;
         foreach (var item in _items)
             panelHeight += item.label == "---" ? SepHeight : ItemHeight;
-        // VLG spacing: (itemCount - 1) * 1f
         if (_items.Count > 1) panelHeight += _items.Count - 1;
 
-        var panelPos = _panel.anchoredPosition;
-        var panelSize = new Vector2(PanelWidth, panelHeight);
-        var winSize   = _windowRect.rect.size;
+        float halfW = _windowRect.rect.width  * 0.5f;
+        float halfH = _windowRect.rect.height * 0.5f;
+        const float safetyPad = 2f;
 
-        float rightEdge = panelPos.x + panelSize.x;
-        if (rightEdge > winSize.x * 0.5f)
-            panelPos.x -= panelSize.x;
+        // 1px from cursor — almost touching
+        float posX = _cursorLocal.x + 1f;
+        float posY = _cursorLocal.y - 1f;
 
-        float bottomEdge = panelPos.y - panelSize.y;
-        if (bottomEdge < -winSize.y * 0.5f)
-            panelPos.y += panelSize.y;
+        // Flip around cursor before placing
+        if (posX + PanelWidth > halfW - safetyPad)
+            posX = _cursorLocal.x - PanelWidth - 1f;
 
-        _panel.anchoredPosition = panelPos;
+        if (posY - panelHeight < -halfH + safetyPad)
+            posY = _cursorLocal.y + panelHeight + 1f;
+
+        // Safety clamp
+        posX = Mathf.Clamp(posX, -halfW + safetyPad, halfW - PanelWidth - safetyPad);
+        posY = Mathf.Clamp(posY, -halfH + panelHeight + safetyPad, halfH - safetyPad);
+
+        _panel.anchoredPosition = new Vector2(posX, posY);
     }
 
     // ── Build ─────────────────────────────────────────────────────────────
@@ -152,8 +157,11 @@ public sealed class FsContextMenu : MonoBehaviour
         go.transform.SetParent(transform, false);
 
         _panel           = go.GetComponent<RectTransform>();
-        _panel.anchorMin = new Vector2(0f, 1f);
-        _panel.anchorMax = new Vector2(0f, 1f);
+        // anchor=(0.5,0.5): anchoredPosition lives in center-relative space,
+        // matching ScreenPointToLocalPointInRectangle output. pivot=(0,1) keeps
+        // the top-left of the panel at the cursor point (menu opens down-right).
+        _panel.anchorMin = new Vector2(0.5f, 0.5f);
+        _panel.anchorMax = new Vector2(0.5f, 0.5f);
         _panel.pivot     = new Vector2(0f, 1f);
         _panel.sizeDelta = new Vector2(160f, 0f);
 
@@ -250,12 +258,10 @@ public sealed class FsContextMenu : MonoBehaviour
         img.color = new Color(1f, 1f, 1f, 0f);
 
         var btn    = go.GetComponent<Button>();
-        var colors = btn.colors;
-        colors.normalColor      = new Color(1f, 1f, 1f, 0f);
-        colors.highlightedColor = new Color(1f, 1f, 1f, 0.13f);
-        colors.pressedColor     = new Color(1f, 1f, 1f, 0.22f);
-        btn.colors = colors;
+        btn.transition = Selectable.Transition.None;
         if (onClick != null) btn.onClick.AddListener(() => onClick());
+        go.AddComponent<ContextMenuItemHover>();
+        // HOVER_INJECT_DONE
 
         var lblGO = new GameObject("L",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -303,4 +309,35 @@ internal sealed class ContextMenuBackdrop : MonoBehaviour, IPointerClickHandler
 internal sealed class ContextMenuClickBlocker : MonoBehaviour, IPointerClickHandler
 {
     public void OnPointerClick(PointerEventData e) { }
+}
+
+/// <summary>Windows-style hover for context menu items.</summary>
+internal sealed class ContextMenuItemHover : MonoBehaviour,
+    UnityEngine.EventSystems.IPointerEnterHandler,
+    UnityEngine.EventSystems.IPointerExitHandler
+{
+    private static readonly Color BgHover   = new Color(0.24f, 0.44f, 0.78f, 0.22f);
+    private static readonly Color TxtHover  = new Color(0.95f, 0.97f, 1.00f, 1f);
+    private static readonly Color TxtNormal = new Color(0.90f, 0.88f, 0.84f, 1f);
+
+    private UnityEngine.UI.Image    _bg;
+    private TMPro.TextMeshProUGUI   _lbl;
+
+    private void Awake()
+    {
+        _bg  = GetComponent<UnityEngine.UI.Image>();
+        _lbl = GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
+    }
+
+    public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData e)
+    {
+        if (_bg  != null) _bg.color  = BgHover;
+        if (_lbl != null) _lbl.color = TxtHover;
+    }
+
+    public void OnPointerExit(UnityEngine.EventSystems.PointerEventData e)
+    {
+        if (_bg  != null) _bg.color  = new Color(1f,1f,1f,0f);
+        if (_lbl != null) _lbl.color = TxtNormal;
+    }
 }

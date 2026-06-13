@@ -117,8 +117,18 @@ public sealed class FsRenameOverlay : MonoBehaviour
         _input.ActivateInputField();
         yield return null;
         Debug.Log($"[Rename] After ActivateInputField — isFocused={_input.isFocused} currentSelected={UnityEngine.EventSystems.EventSystem.current?.currentSelectedGameObject?.name ?? "NONE"}");
+
+        // Select only the filename stem (text before the last dot) for files,
+        // or the full text for folders/names without an extension.
+        int selectEnd = currentName != null ? currentName.Length : 0;
+        if (!string.IsNullOrEmpty(currentName))
+        {
+            int dot = currentName.LastIndexOf('.');
+            // dot > 0 ensures we don't treat dotfiles (e.g. ".") as having an extension
+            if (dot > 0) selectEnd = dot;
+        }
         _input.selectionAnchorPosition = 0;
-        _input.selectionFocusPosition  = currentName != null ? currentName.Length : 0;
+        _input.selectionFocusPosition  = selectEnd;
     }
 
     private void Submit()

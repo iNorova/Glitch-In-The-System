@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
@@ -17,11 +18,20 @@ public sealed class FsItemView : MonoBehaviour,
     [SerializeField] private Image           iconImage;
     [SerializeField] private TextMeshProUGUI nameLabel;
     [SerializeField] private TextMeshProUGUI typeLabel;  // cached — avoids GetChild(2).GetComponent per PopulateContent
+    [SerializeField] private TextMeshProUGUI dateLabel;  // cached date-modified column
     [SerializeField] private Image           background;
 
     private FileSystemManager.FsEntry _entry;
     private bool                      _selected;
     private bool                      _isDragging;
+
+    // ── Inline rename ──────────────────────────────────────────────────────
+    private TMP_InputField _inlineInput;   // built once, reused
+    private Action<string> _renameSubmit;
+    private Action         _renameCancel;
+    private bool           _renaming;
+    private bool           _renameFired;
+    private int            _renameOpenFrame;
 
     // Callbacks wired by FileExplorerApp
     public Action<FsItemView>                OnSingleClick;
@@ -39,7 +49,7 @@ public sealed class FsItemView : MonoBehaviour,
     private static readonly Color BgDropTarget  = new Color(0.30f, 0.70f, 0.40f, 0.30f);
 
     private float _lastClickTime = -1f;
-    private const float DblClickInterval = 0.35f;
+    private const float DblClickInterval = 0.45f; // BATCH 1: was 0.35 — 0.45 feels more like Windows
 
     // Drag ghost — a faded clone of the name label that follows the cursor
     private static GameObject  _dragGhost;
@@ -48,6 +58,20 @@ public sealed class FsItemView : MonoBehaviour,
 
     /// <summary>True while any FsItemView is being dragged. Read by SidebarFolderButton.</summary>
     public static bool IsDragging => _draggingItem != null;
+
+    /// <summary>The FsItemView currently being dragged, or null. Used by SidebarFolderButton.OnDrop()
+    /// so sidebar drops work without requiring a prior single-click selection.</summary>
+    public static FsItemView DraggingItem => _draggingItem;
+
+    /// <summary>Clear all static drag references. Call from FileExplorerApp.OnDisable() to prevent
+    /// stale references after the window is closed or the scene is reloaded.</summary>
+    public static void ClearDragStatics()
+    {
+        if (_dragGhost != null) { _dragGhost.SetActive(false); }
+        _dragGhost    = null;
+        _rootCanvas   = null;
+        _draggingItem = null;
+    }
 
     public void Init(FileSystemManager.FsEntry entry, Sprite folderIcon, Sprite fileIcon)
     {
@@ -65,6 +89,7 @@ public sealed class FsItemView : MonoBehaviour,
         _selected      = false;
         _lastClickTime = -1f;
         if (nameLabel  != null) nameLabel.text   = entry.name;
+        if (dateLabel  != null) dateLabel.text   = FormatDate(entry.lastModified);
         if (background != null) background.color = BgNormal;
         if (iconImage  != null)
         {
@@ -72,14 +97,24 @@ public sealed class FsItemView : MonoBehaviour,
                 ? folderIcon != null : fileIcon != null;
             if (hasSprite)
             {
-                iconImage.sprite = entry.type == FileSystemManager.EntryType.Folder
+                iconImage.sprite          = entry.type == FileSystemManager.EntryType.Folder
                     ? folderIcon : fileIcon;
-                iconImage.color = Color.white;
+                iconImage.color           = Color.white;
+                iconImage.type            = UnityEngine.UI.Image.Type.Simple;
+                iconImage.preserveAspect  = true;
+                // Re-center RT in its 16x16 slot on every rebind (pool reuse can leave stale values)
+                var rt = iconImage.rectTransform;
+                rt.anchorMin        = new Vector2(0.5f, 0.5f);
+                rt.anchorMax        = new Vector2(0.5f, 0.5f);
+                rt.pivot            = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta        = new Vector2(16f, 16f);
             }
             else
             {
-                iconImage.sprite = null;
-                iconImage.color  = iconColor;
+                iconImage.sprite          = null;
+                iconImage.color           = iconColor;
+                iconImage.preserveAspect  = false;
             }
         }
     }
@@ -98,16 +133,27 @@ public sealed class FsItemView : MonoBehaviour,
 
     public FileSystemManager.FsEntry Entry => _entry;
 
-    public void SetRefs(Image bg, Image icon, TextMeshProUGUI label, TextMeshProUGUI typeLbl = null)
+    public void SetRefs(Image bg, Image icon, TextMeshProUGUI label,
+                         TextMeshProUGUI typeLbl = null, TextMeshProUGUI dateLbl = null)
     {
         background = bg;
         iconImage  = icon;
         nameLabel  = label;
         typeLabel  = typeLbl;
+        dateLabel  = dateLbl;
     }
 
     /// <summary>Update the type column label. Uses cached typeLabel — no GetComponent.</summary>
     public void SetTypeLabel(string text) { if (typeLabel != null) typeLabel.text = text; }
+
+    /// <summary>Update the date column label. Uses cached dateLabel — no GetComponent.</summary>
+    public void SetDateLabel(string text) { if (dateLabel != null) dateLabel.text = text; }
+
+    private static string FormatDate(System.DateTime dt)
+    {
+        if (dt == default) return "—";
+        return dt.ToString("dd/MM/yyyy  HH:mm");
+    }
 
     // ── Click handling ────────────────────────────────────────────────────
     public void OnPointerDown(PointerEventData e) { /* required by IPointerDownHandler to receive drag events */ }
@@ -224,6 +270,154 @@ public sealed class FsItemView : MonoBehaviour,
         // Restore visual
         if (background != null)
             background.color = _selected ? BgSelected : BgNormal;
+    }
+
+    // ── Inline rename entry points ─────────────────────────────────────────
+
+    /// <summary>
+    /// Replace the name label with an in-place TMP_InputField.
+    /// Stem-only selection for files; full selection for folders.
+    /// </summary>
+    public void BeginInlineRename(Action<string> onSubmit, Action onCancel)
+    {
+        if (_renaming) return;
+        _renameSubmit    = onSubmit;
+        _renameCancel    = onCancel;
+        _renaming        = true;
+        _renameFired     = false;
+        _renameOpenFrame = Time.frameCount;
+
+        EnsureInlineInput();
+
+        _inlineInput.text = _entry.name;
+        if (nameLabel != null) nameLabel.alpha = 0f;
+        _inlineInput.gameObject.SetActive(true);
+
+        _inlineInput.onSubmit.RemoveAllListeners();
+        _inlineInput.onSubmit.AddListener(_ => SubmitInlineRename());
+
+        StartCoroutine(ActivateInlineInput(_entry.name));
+    }
+
+    /// <summary>Cancel rename without saving — restores nameLabel.</summary>
+    public void CancelInlineRename()
+    {
+        if (!_renaming) return;
+        _renaming = false;
+        if (_inlineInput != null) _inlineInput.gameObject.SetActive(false);
+        if (nameLabel    != null) nameLabel.alpha = 1f;
+        _renameCancel?.Invoke();
+    }
+
+    private void SubmitInlineRename()
+    {
+        if (!_renaming || _renameFired) return;
+        _renameFired = true;
+        _renaming    = false;
+
+        string val = _inlineInput != null ? _inlineInput.text.Trim() : string.Empty;
+        if (_inlineInput != null) _inlineInput.gameObject.SetActive(false);
+        if (nameLabel    != null) nameLabel.alpha = 1f;
+
+        if (!string.IsNullOrEmpty(val)) _renameSubmit?.Invoke(val);
+        else                             _renameCancel?.Invoke();
+    }
+
+    private void Update()
+    {
+        if (!_renaming) return;
+
+        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
+        {
+            CancelInlineRename();
+            return;
+        }
+
+        // Submit on focus-loss (click outside) with 2-frame grace period
+        if (Time.frameCount <= _renameOpenFrame + 1) return;
+        bool leftHeld = Mouse.current?.leftButton.isPressed ?? false;
+        if (_inlineInput != null && !_inlineInput.isFocused && !leftHeld)
+            SubmitInlineRename();
+    }
+
+    private System.Collections.IEnumerator ActivateInlineInput(string currentName)
+    {
+        yield return null;
+        if (_inlineInput == null || !_renaming) yield break;
+        _inlineInput.ActivateInputField();
+        yield return null;
+
+        // Stem-only selection for files; full for folders
+        int selectEnd = currentName != null ? currentName.Length : 0;
+        if (!string.IsNullOrEmpty(currentName))
+        {
+            int dot = currentName.LastIndexOf('.');
+            if (dot > 0) selectEnd = dot;
+        }
+        _inlineInput.selectionAnchorPosition = 0;
+        _inlineInput.selectionFocusPosition  = selectEnd;
+    }
+
+    private void EnsureInlineInput()
+    {
+        if (_inlineInput != null) return;
+
+        // Build the TMP_InputField to exactly overlay the nameLabel rect
+        if (nameLabel == null) return;
+        var nameLabelRT = nameLabel.rectTransform;
+
+        var go = new GameObject("InlineRenameInput",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(TMP_InputField));
+        go.transform.SetParent(nameLabelRT.parent, false);
+
+        // Ignore HLG so it doesn't treat this as a new column item
+        var le = go.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+
+        // Copy exact anchors/offsets from nameLabel so it sits flush
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin        = nameLabelRT.anchorMin;
+        rt.anchorMax        = nameLabelRT.anchorMax;
+        rt.pivot            = nameLabelRT.pivot;
+        rt.anchoredPosition = nameLabelRT.anchoredPosition;
+        rt.sizeDelta        = nameLabelRT.sizeDelta;
+        rt.offsetMin        = nameLabelRT.offsetMin;
+        rt.offsetMax        = nameLabelRT.offsetMax;
+        rt.SetSiblingIndex(nameLabel.transform.GetSiblingIndex());
+
+        go.GetComponent<Image>().color = new Color(0.10f, 0.10f, 0.14f, 0.97f);
+
+        // Viewport
+        var vpGO = new GameObject("Viewport",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(RectMask2D));
+        vpGO.transform.SetParent(go.transform, false);
+        var vpRT = vpGO.GetComponent<RectTransform>();
+        vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one;
+        vpRT.offsetMin = new Vector2(4f, 1f); vpRT.offsetMax = new Vector2(-4f, -1f);
+        vpGO.GetComponent<Image>().color = Color.clear;
+
+        // Text component — match nameLabel's font settings
+        var textGO = new GameObject("Text",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        textGO.transform.SetParent(vpGO.transform, false);
+        var textRT = textGO.GetComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero; textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero; textRT.offsetMax = Vector2.zero;
+        var tmp = textGO.GetComponent<TextMeshProUGUI>();
+        tmp.fontSize      = nameLabel.fontSize;
+        tmp.fontStyle     = nameLabel.fontStyle;
+        tmp.color         = Color.white;
+        tmp.alignment     = TextAlignmentOptions.MidlineLeft;
+        tmp.raycastTarget = false;
+        if (nameLabel.font != null) tmp.font = nameLabel.font;
+
+        _inlineInput                  = go.GetComponent<TMP_InputField>();
+        _inlineInput.textViewport     = vpRT;
+        _inlineInput.textComponent    = tmp;
+        _inlineInput.caretColor       = Color.white;
+        _inlineInput.selectionColor   = new Color(0.28f, 0.52f, 0.90f, 0.6f);
+
+        go.SetActive(false);
     }
 
     // ── Drop target (folders only) ────────────────────────────────────────

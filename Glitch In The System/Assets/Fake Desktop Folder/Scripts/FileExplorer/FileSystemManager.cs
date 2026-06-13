@@ -24,13 +24,15 @@ public sealed class FileSystemManager : MonoBehaviour
         public EntryType type;
         public string    parentPath;
         public string    fullPath;
+        public DateTime  lastModified;
 
         public FsEntry(string name, EntryType type, string parentPath)
         {
-            this.name       = name;
-            this.type       = type;
-            this.parentPath = parentPath;
-            this.fullPath   = parentPath == "" ? "/" + name : parentPath + "/" + name;
+            this.name         = name;
+            this.type         = type;
+            this.parentPath   = parentPath;
+            this.fullPath     = parentPath == "" ? "/" + name : parentPath + "/" + name;
+            this.lastModified = DateTime.Now;
         }
     }
 
@@ -56,6 +58,7 @@ public sealed class FileSystemManager : MonoBehaviour
         public string parentPath;
         public string fullPath;
         public bool   isFolder;
+        public string lastModified; // ISO-8601 string for JsonUtility compatibility
     }
 
     public static readonly string[] SidebarRoots =
@@ -123,8 +126,21 @@ public sealed class FileSystemManager : MonoBehaviour
 
     public IReadOnlyList<FsEntry> GetChildren(string folderPath)
     {
-        if (_children.TryGetValue(folderPath, out var list)) return list;
-        return System.Array.Empty<FsEntry>();
+        if (!_children.TryGetValue(folderPath, out var list) || list.Count == 0)
+            return System.Array.Empty<FsEntry>();
+
+        // BATCH 1: return a sorted copy — folders first, then files, alphabetical within each group.
+        // Do NOT mutate _children — sorted copy only.
+        var sorted = new List<FsEntry>(list.Count);
+        sorted.AddRange(list);
+        sorted.Sort((a, b) =>
+        {
+            bool aIsFolder = a.type == EntryType.Folder;
+            bool bIsFolder = b.type == EntryType.Folder;
+            if (aIsFolder != bIsFolder) return aIsFolder ? -1 : 1;
+            return string.Compare(a.name, b.name, System.StringComparison.OrdinalIgnoreCase);
+        });
+        return sorted;
     }
 
     public bool Exists(string fullPath)     => _entries.ContainsKey(fullPath);
@@ -171,6 +187,7 @@ public sealed class FileSystemManager : MonoBehaviour
         entry.name     = newName;
         entry.fullPath = newFullPath;
         Register(entry);
+        entry.lastModified = DateTime.Now;
         RebuildChildPaths(fullPath, newFullPath);
         MarkDirty();
         NotifyChanged();   // FIX: was never called
@@ -245,10 +262,11 @@ public sealed class FileSystemManager : MonoBehaviour
         foreach (var e in _entries.Values)
             envelope.entries.Add(new EntrySave
             {
-                name       = e.name,
-                parentPath = e.parentPath,
-                fullPath   = e.fullPath,
-                isFolder   = e.type == EntryType.Folder,
+                name         = e.name,
+                parentPath   = e.parentPath,
+                fullPath     = e.fullPath,
+                isFolder     = e.type == EntryType.Folder,
+                lastModified = e.lastModified.ToString("o"),
             });
         PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(envelope));
         PlayerPrefs.Save();
@@ -275,6 +293,9 @@ public sealed class FileSystemManager : MonoBehaviour
                     e.isFolder ? EntryType.Folder : EntryType.File,
                     e.parentPath);
                 entry.fullPath = e.fullPath;
+                if (!string.IsNullOrEmpty(e.lastModified) &&
+                    DateTime.TryParse(e.lastModified, out var lm))
+                    entry.lastModified = lm;
                 _entries[entry.fullPath] = entry;
                 if (!_children.ContainsKey(entry.parentPath))
                     _children[entry.parentPath] = new List<FsEntry>();

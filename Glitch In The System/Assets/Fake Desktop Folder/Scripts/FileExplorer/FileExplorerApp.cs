@@ -33,8 +33,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Button refreshButton;
 
     // ── Sub-systems ───────────────────────────────────────────────────────
-    private FsContextMenu   _contextMenu;
-    private FsRenameOverlay _renameOverlay;
+    private FsContextMenu       _contextMenu;
+    private FsRenameOverlay     _renameOverlay;
+    private FsFolderPickerModal _folderPicker;
+    private FsStatusToast       _toast;        // lightweight auto-hide status feedback
 
     // ── Navigation ────────────────────────────────────────────────────────
     private readonly List<string>              _history     = new();
@@ -82,9 +84,21 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             _renameOverlay.Init();
         }
 
+        if (_folderPicker == null)
+        {
+            var fpGO = new GameObject("FsFolderPickerModal", typeof(RectTransform), typeof(FsFolderPickerModal));
+            fpGO.transform.SetParent(transform, false);
+            var fpRT = fpGO.GetComponent<RectTransform>();
+            fpRT.anchorMin = Vector2.zero; fpRT.anchorMax = Vector2.one;
+            fpRT.offsetMin = Vector2.zero; fpRT.offsetMax = Vector2.zero;
+            _folderPicker = fpGO.GetComponent<FsFolderPickerModal>();
+            _folderPicker.Init();
+        }
+
         EnsurePathText();
         EnsureContentLayout();
         WireRefreshButton();
+        EnsureToast();
     }
 
     private void OnEnable()
@@ -111,6 +125,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     {
         if (FileSystemManager.Instance != null)
             FileSystemManager.Instance.OnChanged -= OnFsChanged;
+        // Clear static drag references so reopening the window starts clean
+        FsItemView.ClearDragStatics();
     }
 
     private void OnFsChanged()
@@ -127,10 +143,24 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (kb == null) return;
 
         bool ctrl = kb.leftCtrlKey.isPressed || kb.rightCtrlKey.isPressed;
-        if (!ctrl) return;
 
-        if (kb.cKey.wasPressedThisFrame)      CopySelected();
-        else if (kb.vKey.wasPressedThisFrame) PasteClipboard();
+        // BATCH 1: keyboard shortcuts (fire only when no modifier key held, except Ctrl combos)
+        if (!ctrl)
+        {
+            if (kb.f2Key.wasPressedThisFrame && _selectedItem != null)
+                BeginRename(_selectedItem);
+
+            else if (kb.deleteKey.wasPressedThisFrame && _selectedItem != null)
+                DeleteSelected();
+
+            else if (kb.enterKey.wasPressedThisFrame && _selectedItem != null)
+                OnItemDoubleClick(_selectedItem.Entry);
+        }
+        else
+        {
+            if (kb.cKey.wasPressedThisFrame)      CopySelected();
+            else if (kb.vKey.wasPressedThisFrame) PasteClipboard();
+        }
     }
 
     // FIX: deep-copy snapshot — stores primitive fields, not a reference to the live FsEntry object.
@@ -162,10 +192,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
         if (snap.type == FileSystemManager.EntryType.Folder)
         {
-            // Folder deep-copy would require recursive clone — deferred, log for now
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.Log("[FileExplorer] Paste: folder copy not yet supported.");
-#endif
+            // Folder copy not yet supported — show non-modal feedback and bail.
+            _toast?.Show("Folder copy not supported yet");
             return;
         }
 
@@ -246,19 +274,44 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     public void BeginRename(FsItemView view)
     {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log($"[Rename] BeginRename: {view?.Entry.name ?? "NULL"}");
-#endif
         if (view == null) return;
-        _renameOverlay.Show(
-            view.GetComponent<RectTransform>(),
-            view.Entry.name,
+        view.BeginInlineRename(
             newName =>
             {
                 var fs = FileSystemManager.Instance;
                 if (fs != null) fs.Rename(view.Entry.fullPath, newName);
             },
             () => { /* cancelled */ }
+        );
+    }
+
+    private void ShowMoveModal(FsItemView view)
+    {
+        if (view == null || _folderPicker == null) return;
+        var entry = view.Entry;
+
+        _folderPicker.Show(
+            sourcePath: entry.fullPath,
+            onConfirm: targetPath =>
+            {
+                // Guard: same folder = no-op
+                if (targetPath == entry.parentPath) return;
+
+                var fs = FileSystemManager.Instance;
+                if (fs == null) return;
+
+                // Guard: cannot move folder into its own descendant
+                if (entry.type == FileSystemManager.EntryType.Folder &&
+                    targetPath.StartsWith(entry.fullPath + "/", System.StringComparison.Ordinal))
+                    return;
+
+                bool ok = fs.Move(entry.fullPath, targetPath);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (!ok) Debug.LogWarning($"[FileExplorer] Move failed: {entry.fullPath} → {targetPath}");
+#endif
+                if (_selectedItem == view) _selectedItem = null;
+            },
+            onCancel: null
         );
     }
 
@@ -269,6 +322,25 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (fs == null) return;
         fs.Move(_selectedItem.Entry.fullPath, targetFolderPath);
         _selectedItem = null;
+    }
+
+    /// <summary>
+    /// Move any entry by path. Used by SidebarFolderButton.OnDrop() which resolves the
+    /// dragged item directly (no _selectedItem dependency), enabling drag-to-sidebar
+    /// without a prior click. Circular-parent guard is inside FileSystemManager.Move().
+    /// </summary>
+    public void MoveEntryTo(string entryFullPath, string targetFolderPath)
+    {
+        if (string.IsNullOrEmpty(entryFullPath) || string.IsNullOrEmpty(targetFolderPath)) return;
+        var fs = FileSystemManager.Instance;
+        if (fs == null) return;
+        bool ok = fs.Move(entryFullPath, targetFolderPath);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (!ok)
+            Debug.LogWarning($"[FileExplorer] MoveEntryTo failed: {entryFullPath} → {targetFolderPath}");
+#endif
+        if (_selectedItem != null && _selectedItem.Entry.fullPath == entryFullPath)
+            _selectedItem = null;
     }
 
     // ── Drag & drop acceptance (content area) ─────────────────────────────
@@ -298,6 +370,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (isFolder)
             _menuItems.Add(("Open",       () => NavigateTo(view.Entry.fullPath)));
         _menuItems.Add(("Copy",       () => { OnItemSingleClick(view); CopySelected(); }));
+        _menuItems.Add(("Move...",    () => ShowMoveModal(view)));
         _menuItems.Add(("Rename",     () => BeginRename(view)));
         _menuItems.Add(("Delete",     () => DeleteSelected()));
         _menuItems.Add(("---",        null));
@@ -312,7 +385,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     {
         _menuItems.Clear();
         _menuItems.Add(("New Folder", () => CreateFolder()));
-        _menuItems.Add(("Paste",      () => PasteClipboard()));
+        // BATCH 1: only show Paste when there is something on the clipboard.
+        if (_clipboard != null)
+            _menuItems.Add(("Paste", () => PasteClipboard()));
         _contextMenu.ShowAt(screenPos, _menuItems);
     }
 
@@ -445,6 +520,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             }
 
             UpdateTypeLabel(view, entry);
+            view.SetDateLabel(view.Entry.lastModified == default ? "—" : view.Entry.lastModified.ToString("dd/MM/yyyy  HH:mm"));
             _items.Add(view);
         }
     }
@@ -470,6 +546,14 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (_contentLayoutReady || fileContent == null) return;
         _contentLayoutReady = true;
 
+        // BATCH 1: Windows-like scroll feel — find the ScrollRect that contains fileContent.
+        var sr = fileContent.GetComponentInParent<UnityEngine.UI.ScrollRect>();
+        if (sr != null)
+        {
+            sr.scrollSensitivity = 100f;
+            sr.decelerationRate  = 0.06f;
+        }
+
         var vlg = fileContent.GetComponent<VerticalLayoutGroup>();
         if (vlg == null) vlg = fileContent.gameObject.AddComponent<VerticalLayoutGroup>();
         vlg.padding              = new RectOffset(4, 4, 4, 4);
@@ -484,6 +568,61 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         fileContent.sizeDelta = new Vector2(fileContent.sizeDelta.x, 0f);
+
+        // ── Column header row ─────────────────────────────────────────────
+        // Guard: never add a second header if EnsureContentLayout somehow runs twice.
+        if (fileContent.Find("__ColumnHeader") == null)
+        {
+            var hdrGO = new GameObject("__ColumnHeader",
+                typeof(RectTransform), typeof(CanvasRenderer),
+                typeof(Image), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            hdrGO.transform.SetParent(fileContent, false);
+            hdrGO.transform.SetAsFirstSibling();
+
+            hdrGO.GetComponent<LayoutElement>().preferredHeight = 24f;
+
+            var hdrImg = hdrGO.GetComponent<Image>();
+            hdrImg.color = new Color(0.14f, 0.14f, 0.17f, 1f);
+            hdrImg.raycastTarget = false;
+
+            // HLG mirrors row layout:
+            // left pad = row-left(6) + icon-width(16) + spacing(6) = 28
+            // right pad = row-right(8), spacing = row-spacing(6)
+            var hdrHLG = hdrGO.GetComponent<HorizontalLayoutGroup>();
+            hdrHLG.padding              = new RectOffset(28, 8, 0, 0);
+            hdrHLG.spacing              = 6;
+            hdrHLG.childAlignment       = TextAnchor.MiddleLeft;
+            hdrHLG.childControlWidth    = false;
+            hdrHLG.childControlHeight   = true;
+            hdrHLG.childForceExpandWidth  = false;
+            hdrHLG.childForceExpandHeight = true;
+
+            AddHeaderLabel(hdrGO.transform, "Name",          0f,   1f);   // flexible
+            AddHeaderLabel(hdrGO.transform, "Date modified", 120f, 0f);   // fixed 120
+            AddHeaderLabel(hdrGO.transform, "Type",          80f,  0f);   // fixed 80
+        }
+    }
+
+    private static void AddHeaderLabel(Transform parent, string text,
+                                       float preferredWidth, float flexibleWidth)
+    {
+        var go = new GameObject("Hdr_" + text,
+            typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(TextMeshProUGUI), typeof(LayoutElement));
+        go.transform.SetParent(parent, false);
+
+        var le = go.GetComponent<LayoutElement>();
+        le.preferredWidth = preferredWidth;
+        le.flexibleWidth  = flexibleWidth;
+
+        var tmp = go.GetComponent<TextMeshProUGUI>();
+        tmp.text          = text.ToUpperInvariant();
+        tmp.fontSize      = 10f;
+        tmp.fontStyle     = FontStyles.Bold;
+        tmp.color         = new Color(0.55f, 0.54f, 0.58f, 1f);
+        tmp.alignment     = TextAlignmentOptions.MidlineLeft;
+        tmp.overflowMode  = TextOverflowModes.Ellipsis;
+        tmp.raycastTarget = false;
     }
 
     private FsItemView BuildItemRow(FileSystemManager.FsEntry entry)
@@ -514,8 +653,17 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         iconLE.preferredWidth  = 16f;
         iconLE.preferredHeight = 16f;
         var iconImg = iconGO.GetComponent<Image>();
-        iconImg.color = GetIconColor(entry);
-        iconImg.raycastTarget = false;
+        iconImg.color           = GetIconColor(entry);
+        iconImg.raycastTarget   = false;
+        iconImg.type            = Image.Type.Simple;
+        iconImg.preserveAspect  = true;
+        // Center the icon RT inside its 16x16 LE slot — fixes visual misalignment from preserveAspect
+        var iconRT = iconGO.GetComponent<RectTransform>();
+        iconRT.anchorMin        = new Vector2(0.5f, 0.5f);
+        iconRT.anchorMax        = new Vector2(0.5f, 0.5f);
+        iconRT.pivot            = new Vector2(0.5f, 0.5f);
+        iconRT.anchoredPosition = Vector2.zero;
+        iconRT.sizeDelta        = new Vector2(16f, 16f);
         if (entry.type == FileSystemManager.EntryType.Folder && folderIcon != null) { iconImg.sprite = folderIcon; iconImg.color = Color.white; }
         if (entry.type == FileSystemManager.EntryType.File   && fileIcon   != null) { iconImg.sprite = fileIcon;   iconImg.color = Color.white; }
 
@@ -531,19 +679,32 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         tmp.overflowMode  = TextOverflowModes.Ellipsis;
         tmp.raycastTarget = false;
 
+        var dateGO = new GameObject("Date",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        dateGO.transform.SetParent(go.transform, false);
+        dateGO.AddComponent<LayoutElement>().preferredWidth = 120f;
+        var dateTMP = dateGO.GetComponent<TextMeshProUGUI>();
+        dateTMP.text          = entry.lastModified == default ? "\u2014" : entry.lastModified.ToString("dd/MM/yyyy  HH:mm");
+        dateTMP.fontSize      = 11;
+        dateTMP.color         = new Color(0.55f, 0.54f, 0.52f, 0.85f);
+        dateTMP.alignment     = TextAlignmentOptions.MidlineLeft;
+        dateTMP.overflowMode  = TextOverflowModes.Ellipsis;
+        dateTMP.raycastTarget = false;
+
         var typeGO = new GameObject("Type",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         typeGO.transform.SetParent(go.transform, false);
-        typeGO.AddComponent<LayoutElement>().preferredWidth = 64f;
+        typeGO.AddComponent<LayoutElement>().preferredWidth = 80f;
         var typeTMP = typeGO.GetComponent<TextMeshProUGUI>();
         typeTMP.text          = GetTypeLabel(entry);
         typeTMP.fontSize      = 11;
         typeTMP.color         = new Color(0.55f, 0.54f, 0.52f, 0.85f);
-        typeTMP.alignment     = TextAlignmentOptions.MidlineRight;
+        typeTMP.alignment     = TextAlignmentOptions.MidlineLeft;
+        typeTMP.overflowMode  = TextOverflowModes.Ellipsis;
         typeTMP.raycastTarget = false;
 
         var view = go.GetComponent<FsItemView>();
-        view.SetRefs(bgImg, iconImg, tmp, typeTMP); // cache typeLabel — eliminates GetChild(2).GetComponent per PopulateContent
+        view.SetRefs(bgImg, iconImg, tmp, typeTMP, dateTMP); // cache all labels — no GetComponent per row
         view.Init(entry, folderIcon, fileIcon);
         view.OnSingleClick  = OnItemSingleClick;
         view.OnDoubleClick  = OnItemDoubleClick;
@@ -611,6 +772,22 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (csf == null) csf = sidebarContent.gameObject.AddComponent<ContentSizeFitter>();
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+        // ── QUICK ACCESS header ───────────────────────────────────────────────
+        var headerGO = new GameObject("SidebarHeader",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        headerGO.transform.SetParent(sidebarContent, false);
+        var headerLE = headerGO.AddComponent<LayoutElement>();
+        headerLE.preferredHeight = 22f;
+        var headerTMP = headerGO.GetComponent<TextMeshProUGUI>();
+        headerTMP.text          = "QUICK ACCESS";
+        headerTMP.fontSize      = 9;
+        headerTMP.color         = new Color(0.50f, 0.49f, 0.47f, 1f);
+        headerTMP.alignment     = TextAlignmentOptions.MidlineLeft;
+        headerTMP.fontStyle     = FontStyles.Bold;
+        headerTMP.raycastTarget = false;
+        var headerRT = headerGO.GetComponent<RectTransform>();
+        headerRT.offsetMin = new Vector2(10f, 0f);
+
         foreach (var root in FileSystemManager.SidebarRoots)
             _sidebarBtns.Add(BuildSidebarButtonGO(root, "/" + root));
     }
@@ -660,8 +837,19 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
         var navBar = transform.Find("NavigationBar");
         if (navBar == null) return;
+
+        // Style NavigationBar background for Windows-style path bar
+        var navImg = navBar.GetComponent<UnityEngine.UI.Image>();
+        if (navImg == null) navImg = navBar.gameObject.AddComponent<UnityEngine.UI.Image>();
+        navImg.color = new Color(0.11f, 0.11f, 0.13f, 1f);
+
         var pathBar = navBar.Find("PathBar");
         if (pathBar == null) return;
+
+        // Style the PathBar pill/input-style background
+        var pbImg = pathBar.GetComponent<UnityEngine.UI.Image>();
+        if (pbImg == null) pbImg = pathBar.gameObject.AddComponent<UnityEngine.UI.Image>();
+        pbImg.color = new Color(0.17f, 0.17f, 0.20f, 1f);
 
         pathText = pathBar.GetComponentInChildren<TextMeshProUGUI>(true);
         if (pathText != null) return;
@@ -692,6 +880,13 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (refreshButton == null) return;
         refreshButton.onClick.RemoveAllListeners();
         refreshButton.onClick.AddListener(Refresh);
+    }
+
+    // ── Toast ─────────────────────────────────────────────────────────────
+    private void EnsureToast()
+    {
+        if (_toast != null) return;
+        _toast = GetComponent<FsStatusToast>() ?? gameObject.AddComponent<FsStatusToast>();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
