@@ -23,6 +23,8 @@ public sealed class SidebarFolderButton : MonoBehaviour,
 
     private static SidebarFolderButton _dragging;
     private static GameObject          _sidebarDragGhost;
+    private static RectTransform       _sidebarDragGhostRT;   // PERF: cached — avoids GetComponent per drag frame
+    private static TextMeshProUGUI     _sidebarDragGhostTMP;  // PERF: cached — avoids GetComponent on reuse
 
     private static readonly Color Normal          = new Color(1f,    1f,    1f,    0.000f);
     private static readonly Color Hover           = new Color(1f,    1f,    1f,    0.070f);
@@ -145,11 +147,13 @@ public sealed class SidebarFolderButton : MonoBehaviour,
             var rt = _sidebarDragGhost.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(160f,26f);
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f,1f);
+            _sidebarDragGhostRT = rt; // cache once — reused in OnDrag every frame
             var tmp = _sidebarDragGhost.GetComponent<TextMeshProUGUI>();
+            _sidebarDragGhostTMP = tmp; // cache once
             tmp.fontSize = 12; tmp.color = new Color(0.80f,0.78f,0.75f,0.70f);
             tmp.alignment = TextAlignmentOptions.MidlineLeft; tmp.raycastTarget = false;
         }
-        var ghostTMP = _sidebarDragGhost.GetComponent<TextMeshProUGUI>();
+        var ghostTMP = _sidebarDragGhostTMP; // cached — no GetComponent
         if (ghostTMP != null) ghostTMP.text = label != null ? label.text : _folderPath;
         _sidebarDragGhost.SetActive(true);
         _sidebarDragGhost.transform.SetAsLastSibling();
@@ -162,7 +166,7 @@ public sealed class SidebarFolderButton : MonoBehaviour,
         if (_canvas == null) return;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
             _canvas.transform as RectTransform, e.position, _canvas.worldCamera, out var local);
-        _sidebarDragGhost.GetComponent<RectTransform>().anchoredPosition = local + new Vector2(10f,-6f);
+        if (_sidebarDragGhostRT != null) _sidebarDragGhostRT.anchoredPosition = local + new Vector2(10f,-6f);
     }
 
     public void OnEndDrag(PointerEventData e)

@@ -53,7 +53,9 @@ public sealed class FsItemView : MonoBehaviour,
     private const float DblClickInterval = 0.45f; // BATCH 1: was 0.35 — 0.45 feels more like Windows
 
     // Drag ghost — a faded clone of the name label that follows the cursor
-    private static GameObject  _dragGhost;
+    private static GameObject            _dragGhost;
+    private static RectTransform         _dragGhostRT;   // PERF: cached — avoids GetComponent per drag frame
+    private static TMPro.TextMeshProUGUI _dragGhostTMP;  // PERF: cached — avoids GetComponent per drag frame
     private static FsItemView  _draggingItem;
     private static Canvas      _rootCanvas;
 
@@ -70,6 +72,8 @@ public sealed class FsItemView : MonoBehaviour,
     {
         if (_dragGhost != null) { _dragGhost.SetActive(false); }
         _dragGhost    = null;
+        _dragGhostRT  = null;
+        _dragGhostTMP = null;
         _rootCanvas   = null;
         _draggingItem = null;
     }
@@ -222,6 +226,7 @@ public sealed class FsItemView : MonoBehaviour,
             var rt = _dragGhost.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(200f, 28f);
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);
+            _dragGhostRT = rt; // cache once — reused in OnDrag every frame
 
             var tmp = _dragGhost.GetComponent<TMPro.TextMeshProUGUI>();
             tmp.text          = _entry.name;
@@ -229,6 +234,7 @@ public sealed class FsItemView : MonoBehaviour,
             tmp.color         = new Color(0.90f, 0.88f, 0.84f, 0.75f);
             tmp.alignment     = TextAlignmentOptions.MidlineLeft;
             tmp.raycastTarget = false;
+            _dragGhostTMP = tmp; // cache once
 
             // Bring ghost to front
             _dragGhost.transform.SetAsLastSibling();
@@ -236,7 +242,7 @@ public sealed class FsItemView : MonoBehaviour,
         else if (_dragGhost != null)
         {
             // Reuse — just update label
-            var tmp = _dragGhost.GetComponent<TMPro.TextMeshProUGUI>();
+            var tmp = _dragGhostTMP; // cached — no GetComponent
             if (tmp != null) tmp.text = _entry.name;
             _dragGhost.SetActive(true);
             _dragGhost.transform.SetAsLastSibling();
@@ -257,8 +263,7 @@ public sealed class FsItemView : MonoBehaviour,
             _rootCanvas.worldCamera,
             out var localPos);
 
-        var rt = _dragGhost.GetComponent<RectTransform>();
-        rt.anchoredPosition = localPos + new Vector2(12f, -8f);
+        if (_dragGhostRT != null) _dragGhostRT.anchoredPosition = localPos + new Vector2(12f, -8f);
     }
 
     public void OnEndDrag(PointerEventData e)

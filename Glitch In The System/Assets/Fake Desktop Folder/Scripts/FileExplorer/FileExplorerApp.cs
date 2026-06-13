@@ -24,6 +24,11 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Button          forwardButton;
     [SerializeField] private TextMeshProUGUI emptyLabel;
 
+    // Cached nav-button TMP label refs — assigned once in OnEnable.
+    // Avoids GetComponentInChildren<TMP> on every folder navigation.
+    private TMPro.TextMeshProUGUI _backLabel;
+    private TMPro.TextMeshProUGUI _forwardLabel;
+
     [Header("Icons (optional)")]
     [SerializeField] private Sprite folderIcon;
     [SerializeField] private Sprite fileIcon;
@@ -111,8 +116,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         var canvas = GetComponentInParent<Canvas>();
         if (_contextMenu != null) _contextMenu.Init(canvas);
 
-        if (backButton    != null) { backButton.onClick.RemoveAllListeners();    backButton.onClick.AddListener(GoBack);    }
-        if (forwardButton != null) { forwardButton.onClick.RemoveAllListeners(); forwardButton.onClick.AddListener(GoForward); }
+        if (backButton    != null) { backButton.onClick.RemoveAllListeners();    backButton.onClick.AddListener(GoBack);    _backLabel    = backButton.GetComponentInChildren<TMPro.TextMeshProUGUI>(true); }
+        if (forwardButton != null) { forwardButton.onClick.RemoveAllListeners(); forwardButton.onClick.AddListener(GoForward); _forwardLabel = forwardButton.GetComponentInChildren<TMPro.TextMeshProUGUI>(true); }
 
         if (_sidebarBtns.Count == 0 || (sidebarContent != null && sidebarContent.childCount == 0))
             BuildSidebar();
@@ -472,12 +477,12 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (backButton != null)
         {
             backButton.interactable = _histIdx > 0;
-            SetButtonLabelAlpha(backButton, _histIdx > 0);
+            if (_backLabel != null) _backLabel.alpha = _histIdx > 0 ? 1f : 0.30f;
         }
         if (forwardButton != null)
         {
             forwardButton.interactable = _histIdx < _history.Count - 1;
-            SetButtonLabelAlpha(forwardButton, _histIdx < _history.Count - 1);
+            if (_forwardLabel != null) _forwardLabel.alpha = _histIdx < _history.Count - 1 ? 1f : 0.30f;
         }
 
         foreach (var btn in _sidebarBtns)
