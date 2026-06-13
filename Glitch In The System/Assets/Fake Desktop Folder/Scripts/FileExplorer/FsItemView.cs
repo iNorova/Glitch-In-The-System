@@ -21,7 +21,7 @@ public sealed class FsItemView : MonoBehaviour,
     [SerializeField] private TextMeshProUGUI dateLabel;  // cached date-modified column
     [SerializeField] private Image           background;
 
-    private FileSystemManager.FsEntry _entry;
+    private FileExplorerManager.FsEntry _entry;
     private bool                      _selected;
     private bool                      _isDragging;
 
@@ -32,10 +32,11 @@ public sealed class FsItemView : MonoBehaviour,
     private bool           _renaming;
     private bool           _renameFired;
     private int            _renameOpenFrame;
+    private UnityEngine.Events.UnityAction<string> _submitListener; // FIX-2: cached delegate
 
     // Callbacks wired by FileExplorerApp
     public Action<FsItemView>                OnSingleClick;
-    public Action<FileSystemManager.FsEntry> OnDoubleClick;
+    public Action<FileExplorerManager.FsEntry> OnDoubleClick;
     public Action<FsItemView, Vector2>       OnRightClick;
     /// <summary>Called when this item is dropped onto a folder target. Arg = target folder path.</summary>
     public Action<FsItemView, string>        OnDroppedOnto;
@@ -73,16 +74,16 @@ public sealed class FsItemView : MonoBehaviour,
         _draggingItem = null;
     }
 
-    public void Init(FileSystemManager.FsEntry entry, Sprite folderIcon, Sprite fileIcon)
+    public void Init(FileExplorerManager.FsEntry entry, Sprite folderIcon, Sprite fileIcon)
     {
         _entry = entry;
         if (nameLabel  != null) nameLabel.text   = entry.name;
         if (iconImage  != null) iconImage.sprite  =
-            entry.type == FileSystemManager.EntryType.Folder ? folderIcon : fileIcon;
+            entry.type == FileExplorerManager.EntryType.Folder ? folderIcon : fileIcon;
         if (background != null) background.color  = BgNormal;
     }
 
-    public void Rebind(FileSystemManager.FsEntry entry, Sprite folderIcon, Sprite fileIcon,
+    public void Rebind(FileExplorerManager.FsEntry entry, Sprite folderIcon, Sprite fileIcon,
                        Color iconColor)
     {
         _entry         = entry;
@@ -93,11 +94,11 @@ public sealed class FsItemView : MonoBehaviour,
         if (background != null) background.color = BgNormal;
         if (iconImage  != null)
         {
-            bool hasSprite = entry.type == FileSystemManager.EntryType.Folder
+            bool hasSprite = entry.type == FileExplorerManager.EntryType.Folder
                 ? folderIcon != null : fileIcon != null;
             if (hasSprite)
             {
-                iconImage.sprite          = entry.type == FileSystemManager.EntryType.Folder
+                iconImage.sprite          = entry.type == FileExplorerManager.EntryType.Folder
                     ? folderIcon : fileIcon;
                 iconImage.color           = Color.white;
                 iconImage.type            = UnityEngine.UI.Image.Type.Simple;
@@ -131,7 +132,7 @@ public sealed class FsItemView : MonoBehaviour,
         if (nameLabel != null) nameLabel.text = newName;
     }
 
-    public FileSystemManager.FsEntry Entry => _entry;
+    public FileExplorerManager.FsEntry Entry => _entry;
 
     public void SetRefs(Image bg, Image icon, TextMeshProUGUI label,
                          TextMeshProUGUI typeLbl = null, TextMeshProUGUI dateLbl = null)
@@ -186,7 +187,7 @@ public sealed class FsItemView : MonoBehaviour,
     {
         // If something is being dragged and we're a folder, show drop highlight
         if (_draggingItem != null && _draggingItem != this &&
-            _entry.type == FileSystemManager.EntryType.Folder)
+            _entry.type == FileExplorerManager.EntryType.Folder)
         {
             if (background != null) background.color = BgDropTarget;
             return;
@@ -288,13 +289,15 @@ public sealed class FsItemView : MonoBehaviour,
         _renameOpenFrame = Time.frameCount;
 
         EnsureInlineInput();
+        SyncInlineInputRect();       // FIX-1: re-copy RT from current nameLabel (pooled rows)
 
         _inlineInput.text = _entry.name;
         if (nameLabel != null) nameLabel.alpha = 0f;
         _inlineInput.gameObject.SetActive(true);
 
+        // FIX-2: ensure exactly one submit listener — unsubscribe before subscribe
         _inlineInput.onSubmit.RemoveAllListeners();
-        _inlineInput.onSubmit.AddListener(_ => SubmitInlineRename());
+        _inlineInput.onSubmit.AddListener(_submitListener ??= _ => SubmitInlineRename());
 
         StartCoroutine(ActivateInlineInput(_entry.name));
     }
@@ -326,6 +329,15 @@ public sealed class FsItemView : MonoBehaviour,
     private void Update()
     {
         if (!_renaming) return;
+
+        // FIX-1: abort if row was disabled or input destroyed during rename
+        if (_inlineInput == null || !gameObject.activeInHierarchy)
+        {
+            _renaming    = false;
+            _renameFired = false;
+            _renameCancel?.Invoke();
+            return;
+        }
 
         if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
         {
@@ -420,13 +432,30 @@ public sealed class FsItemView : MonoBehaviour,
         go.SetActive(false);
     }
 
+    /// <summary>FIX-1: Re-copy nameLabel RectTransform values into _inlineInput.
+    /// Called every BeginInlineRename() so pooled rows always align correctly.</summary>
+    private void SyncInlineInputRect()
+    {
+        if (_inlineInput == null || nameLabel == null) return;
+        var src = nameLabel.rectTransform;
+        var dst = _inlineInput.GetComponent<RectTransform>();
+        dst.anchorMin        = src.anchorMin;
+        dst.anchorMax        = src.anchorMax;
+        dst.pivot            = src.pivot;
+        dst.anchoredPosition = src.anchoredPosition;
+        dst.sizeDelta        = src.sizeDelta;
+        dst.offsetMin        = src.offsetMin;
+        dst.offsetMax        = src.offsetMax;
+        dst.SetSiblingIndex(nameLabel.transform.GetSiblingIndex());
+    }
+
     // ── Drop target (folders only) ────────────────────────────────────────
     public void OnDrop(PointerEventData e)
     {
         // Clear drop highlight
         if (!_selected && background != null) background.color = BgNormal;
 
-        if (_entry.type != FileSystemManager.EntryType.Folder) return;
+        if (_entry.type != FileExplorerManager.EntryType.Folder) return;
         if (_draggingItem == null || _draggingItem == this)    return;
         if (_draggingItem._entry.fullPath == _entry.fullPath)  return;
 
@@ -435,5 +464,17 @@ public sealed class FsItemView : MonoBehaviour,
             StringComparison.Ordinal)) return;
 
         OnReceivedDrop?.Invoke(this, _draggingItem);
+    }
+
+    private void OnDisable()
+    {
+        // FIX-1: clean up rename state when row is pooled/hidden mid-rename
+        if (_renaming)
+        {
+            _renaming    = false;
+            _renameFired = false;
+            if (_inlineInput != null) _inlineInput.gameObject.SetActive(false);
+            if (nameLabel    != null) nameLabel.alpha = 1f;
+        }
     }
 }

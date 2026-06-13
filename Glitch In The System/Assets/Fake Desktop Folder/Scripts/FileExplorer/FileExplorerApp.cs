@@ -12,7 +12,7 @@ using TMPro;
 ///   - Drag-drop move: drop file/folder onto a folder row to move it (FsItemView)
 ///   - Sidebar drag: SidebarFolderButton now supports drag-drop between sidebar roots
 ///   - Refresh button: scene-placed RefreshButton wired via Inspector [SerializeField]
-///   - OnFsChanged now fires correctly (FileSystemManager.NotifyChanged fixed)
+///   - OnFsChanged now fires correctly (FileExplorerManager.NotifyChanged fixed)
 /// </summary>
 public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 {
@@ -55,7 +55,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     private struct ClipboardSnapshot
     {
         public string                         name;
-        public FileSystemManager.EntryType    type;
+        public FileExplorerManager.EntryType    type;
         public string                         parentPath;
         // Extendable: add metadata fields here as the FS grows
     }
@@ -103,8 +103,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     private void OnEnable()
     {
-        if (FileSystemManager.Instance != null)
-            FileSystemManager.Instance.OnChanged += OnFsChanged;
+        if (FileExplorerManager.Instance != null)
+            FileExplorerManager.Instance.OnChanged += OnFsChanged;
 
         EnsureAwakeInit();
 
@@ -123,8 +123,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
     private void OnDisable()
     {
-        if (FileSystemManager.Instance != null)
-            FileSystemManager.Instance.OnChanged -= OnFsChanged;
+        if (FileExplorerManager.Instance != null)
+            FileExplorerManager.Instance.OnChanged -= OnFsChanged;
         // Clear static drag references so reopening the window starts clean
         FsItemView.ClearDragStatics();
     }
@@ -147,8 +147,20 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         // BATCH 1: keyboard shortcuts (fire only when no modifier key held, except Ctrl combos)
         if (!ctrl)
         {
-            if (kb.f2Key.wasPressedThisFrame && _selectedItem != null)
+            if (kb.f2Key.wasPressedThisFrame &&
+                _selectedItem != null &&
+                _selectedItem.gameObject.activeInHierarchy &&
+                _selectedItem.Entry != null)
+            {
                 BeginRename(_selectedItem);
+            }
+            else if (kb.f2Key.wasPressedThisFrame &&
+                     _selectedItem != null &&
+                     (!_selectedItem.gameObject.activeInHierarchy ||
+                      _selectedItem.Entry == null))
+            {
+                _selectedItem = null; // FIX-2: discard stale reference
+            }
 
             else if (kb.deleteKey.wasPressedThisFrame && _selectedItem != null)
                 DeleteSelected();
@@ -187,10 +199,10 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         if (_clipboard == null) return;
 
         var snap = _clipboard.Value;
-        var fs   = FileSystemManager.Instance;
+        var fs   = FileExplorerManager.Instance;
         if (fs == null) return;
 
-        if (snap.type == FileSystemManager.EntryType.Folder)
+        if (snap.type == FileExplorerManager.EntryType.Folder)
         {
             // Folder copy not yet supported — show non-modal feedback and bail.
             _toast?.Show("Folder copy not supported yet");
@@ -242,7 +254,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     // ── File Actions ──────────────────────────────────────────────────────
     public void CreateFolder()
     {
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
 
         string name = "New Folder";
@@ -259,7 +271,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     public void DeleteSelected()
     {
         if (_selectedItem == null) return;
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
 
         // Invalidate clipboard if the copied item is being deleted
@@ -275,10 +287,12 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     public void BeginRename(FsItemView view)
     {
         if (view == null) return;
+        // FIX-2: reject stale pooled reference
+        if (view.Entry == null) { _selectedItem = null; return; }
         view.BeginInlineRename(
             newName =>
             {
-                var fs = FileSystemManager.Instance;
+                var fs = FileExplorerManager.Instance;
                 if (fs != null) fs.Rename(view.Entry.fullPath, newName);
             },
             () => { /* cancelled */ }
@@ -297,11 +311,11 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
                 // Guard: same folder = no-op
                 if (targetPath == entry.parentPath) return;
 
-                var fs = FileSystemManager.Instance;
+                var fs = FileExplorerManager.Instance;
                 if (fs == null) return;
 
                 // Guard: cannot move folder into its own descendant
-                if (entry.type == FileSystemManager.EntryType.Folder &&
+                if (entry.type == FileExplorerManager.EntryType.Folder &&
                     targetPath.StartsWith(entry.fullPath + "/", System.StringComparison.Ordinal))
                     return;
 
@@ -318,7 +332,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     public void MoveSelectedTo(string targetFolderPath)
     {
         if (_selectedItem == null) return;
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
         fs.Move(_selectedItem.Entry.fullPath, targetFolderPath);
         _selectedItem = null;
@@ -327,12 +341,12 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     /// <summary>
     /// Move any entry by path. Used by SidebarFolderButton.OnDrop() which resolves the
     /// dragged item directly (no _selectedItem dependency), enabling drag-to-sidebar
-    /// without a prior click. Circular-parent guard is inside FileSystemManager.Move().
+    /// without a prior click. Circular-parent guard is inside FileExplorerManager.Move().
     /// </summary>
     public void MoveEntryTo(string entryFullPath, string targetFolderPath)
     {
         if (string.IsNullOrEmpty(entryFullPath) || string.IsNullOrEmpty(targetFolderPath)) return;
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
         bool ok = fs.Move(entryFullPath, targetFolderPath);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -347,9 +361,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     private void OnItemReceivedDrop(FsItemView target, FsItemView dragged)
     {
         if (target == null || dragged == null) return;
-        if (target.Entry.type != FileSystemManager.EntryType.Folder) return;
+        if (target.Entry.type != FileExplorerManager.EntryType.Folder) return;
 
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
 
         bool ok = fs.Move(dragged.Entry.fullPath, target.Entry.fullPath);
@@ -364,7 +378,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
     // ── Context menu ──────────────────────────────────────────────────────
     private void ShowItemContextMenu(FsItemView view, Vector2 screenPos)
     {
-        bool isFolder = view.Entry.type == FileSystemManager.EntryType.Folder;
+        bool isFolder = view.Entry.type == FileExplorerManager.EntryType.Folder;
 
         _menuItems.Clear();
         if (isFolder)
@@ -421,7 +435,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             return;
         }
 
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
 
         bool ok = fs.Move(draggedPath, targetPath);
@@ -481,7 +495,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
 
         if (fileContent == null) return;
 
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
         var children = fs.GetChildren(path);
 
@@ -525,15 +539,15 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         }
     }
 
-    private static void UpdateTypeLabel(FsItemView view, FileSystemManager.FsEntry entry)
+    private static void UpdateTypeLabel(FsItemView view, FileExplorerManager.FsEntry entry)
     {
         // Uses FsItemView.SetTypeLabel — cached reference, no GetChild/GetComponent.
         view.SetTypeLabel(GetTypeLabel(entry));
     }
 
-    private static Color GetIconColor(FileSystemManager.FsEntry entry)
+    private static Color GetIconColor(FileExplorerManager.FsEntry entry)
     {
-        if (entry.type == FileSystemManager.EntryType.Folder)
+        if (entry.type == FileExplorerManager.EntryType.Folder)
             return new Color(0.96f, 0.76f, 0.26f, 1f);
         if (!string.IsNullOrEmpty(entry.name) &&
             entry.name.EndsWith(".lnk", System.StringComparison.OrdinalIgnoreCase))
@@ -625,7 +639,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         tmp.raycastTarget = false;
     }
 
-    private FsItemView BuildItemRow(FileSystemManager.FsEntry entry)
+    private FsItemView BuildItemRow(FileExplorerManager.FsEntry entry)
     {
         var go = new GameObject("FsItem_" + entry.name,
             typeof(RectTransform), typeof(CanvasRenderer),
@@ -664,8 +678,8 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         iconRT.pivot            = new Vector2(0.5f, 0.5f);
         iconRT.anchoredPosition = Vector2.zero;
         iconRT.sizeDelta        = new Vector2(16f, 16f);
-        if (entry.type == FileSystemManager.EntryType.Folder && folderIcon != null) { iconImg.sprite = folderIcon; iconImg.color = Color.white; }
-        if (entry.type == FileSystemManager.EntryType.File   && fileIcon   != null) { iconImg.sprite = fileIcon;   iconImg.color = Color.white; }
+        if (entry.type == FileExplorerManager.EntryType.Folder && folderIcon != null) { iconImg.sprite = folderIcon; iconImg.color = Color.white; }
+        if (entry.type == FileExplorerManager.EntryType.File   && fileIcon   != null) { iconImg.sprite = fileIcon;   iconImg.color = Color.white; }
 
         var lblGO = new GameObject("Name",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -714,9 +728,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         return view;
     }
 
-    private static string GetTypeLabel(FileSystemManager.FsEntry entry)
+    private static string GetTypeLabel(FileExplorerManager.FsEntry entry)
     {
-        if (entry.type == FileSystemManager.EntryType.Folder) return "Folder";
+        if (entry.type == FileExplorerManager.EntryType.Folder) return "Folder";
         string name = entry.name ?? "";
         int dot = name.LastIndexOf('.');
         if (dot < 0) return "File";
@@ -743,9 +757,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         _selectedItem = clicked;
     }
 
-    private void OnItemDoubleClick(FileSystemManager.FsEntry entry)
+    private void OnItemDoubleClick(FileExplorerManager.FsEntry entry)
     {
-        if (entry.type == FileSystemManager.EntryType.Folder)
+        if (entry.type == FileExplorerManager.EntryType.Folder)
             NavigateTo(entry.fullPath);
         else
             FsAppRouter.OpenFile(entry);
@@ -788,7 +802,7 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         var headerRT = headerGO.GetComponent<RectTransform>();
         headerRT.offsetMin = new Vector2(10f, 0f);
 
-        foreach (var root in FileSystemManager.SidebarRoots)
+        foreach (var root in FileExplorerManager.SidebarRoots)
             _sidebarBtns.Add(BuildSidebarButtonGO(root, "/" + root));
     }
 

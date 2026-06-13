@@ -80,11 +80,18 @@ public static class DesktopLauncherHub
     /// Does NOT open Paint — view-only.
     /// </summary>
     public static void OpenImagePreview(Texture2D texture)
+        => OpenImagePreview(texture, null);
+
+    /// Open preview with an explicit title-bar filename.
+    public static void OpenImagePreview(Texture2D texture, string fileName)
     {
         if (texture == null) return;
         var preview = Object.FindFirstObjectByType<SnippingExpandPreview>(FindObjectsInactive.Include);
         if (preview != null)
-            preview.OpenModal(texture);
+        {
+            if (!string.IsNullOrEmpty(fileName)) preview.OpenModal(texture, fileName);
+            else                                  preview.OpenModal(texture);
+        }
         else
             Debug.LogWarning("[DesktopLauncherHub] SnippingExpandPreview not found in scene.");
     }

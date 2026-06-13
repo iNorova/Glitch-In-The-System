@@ -208,16 +208,16 @@ public sealed class PaintApp : MonoBehaviour,
     ///
     /// Call this from a "Save" button on the Paint UI.
     /// Returns the new file name (e.g. "screenshot_20240115_143022.png"), or null
-    /// if FileSystemManager is not available.
+    /// if FileExplorerManager is not available.
     ///
     /// Drawing logic, canvas, and texture are completely unchanged.
     /// </summary>
     public string SaveToExplorer()
     {
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null)
         {
-            Debug.LogWarning("[PaintApp] SaveToExplorer: FileSystemManager not available.");
+            Debug.LogWarning("[PaintApp] SaveToExplorer: FileExplorerManager not available.");
             return null;
         }
 

@@ -18,6 +18,8 @@ public sealed class SidebarFolderButton : MonoBehaviour,
     private bool            _selected;
     private bool            _dropHovered;
     private GameObject      _accentBar;
+    private RectTransform   _rt;      // PERF-2: cached
+    private Canvas          _canvas;  // PERF-2: cached
 
     private static SidebarFolderButton _dragging;
     private static GameObject          _sidebarDragGhost;
@@ -30,7 +32,13 @@ public sealed class SidebarFolderButton : MonoBehaviour,
     private static readonly Color LabelSelected   = new Color(0.95f, 0.93f, 0.90f, 1f);
     private static readonly Color LabelDropTarget = new Color(0.92f, 0.96f, 1.00f, 1f);
 
-    public void Init(FileExplorerApp app, string folderPath, string displayName)
+    private void Awake()
+    {
+        _rt     = GetComponent<RectTransform>();
+        _canvas = GetComponentInParent<Canvas>();
+    }
+
+        public void Init(FileExplorerApp app, string folderPath, string displayName)
     {
         _app        = app;
         _folderPath = folderPath;
@@ -84,11 +92,10 @@ public sealed class SidebarFolderButton : MonoBehaviour,
 
         if (Mouse.current == null) return;
 
-        var     rt      = GetComponent<RectTransform>();
-        var     canvas  = GetComponentInParent<Canvas>();
+        if (_canvas == null) _canvas = GetComponentInParent<Canvas>();
         Vector2 mPos    = Mouse.current.position.ReadValue();
         bool    over    = RectTransformUtility.RectangleContainsScreenPoint(
-                              rt, mPos, canvas != null ? canvas.worldCamera : null);
+                              _rt, mPos, _canvas != null ? _canvas.worldCamera : null);
 
         if (over  && !_dropHovered) { _dropHovered = true;  ApplyDropHover(true);  }
         if (!over &&  _dropHovered) { _dropHovered = false; ApplyDropHover(false); }
@@ -128,13 +135,13 @@ public sealed class SidebarFolderButton : MonoBehaviour,
         if (e.button != PointerEventData.InputButton.Left) return;
         _dragging = this;
         if (background != null) background.color = new Color(1f,1f,1f,0.03f);
-        var canvas = GetComponentInParent<Canvas>();
-        if (canvas == null) return;
+        if (_canvas == null) _canvas = GetComponentInParent<Canvas>();
+        if (_canvas == null) return;
         if (_sidebarDragGhost == null)
         {
             _sidebarDragGhost = new GameObject("SidebarDragGhost",
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            _sidebarDragGhost.transform.SetParent(canvas.transform, false);
+            _sidebarDragGhost.transform.SetParent(_canvas.transform, false);
             var rt = _sidebarDragGhost.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(160f,26f);
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f,1f);
@@ -151,10 +158,10 @@ public sealed class SidebarFolderButton : MonoBehaviour,
     public void OnDrag(PointerEventData e)
     {
         if (_dragging != this || _sidebarDragGhost == null) return;
-        var canvas = GetComponentInParent<Canvas>();
-        if (canvas == null) return;
+        if (_canvas == null) _canvas = GetComponentInParent<Canvas>();
+        if (_canvas == null) return;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            canvas.transform as RectTransform, e.position, canvas.worldCamera, out var local);
+            _canvas.transform as RectTransform, e.position, _canvas.worldCamera, out var local);
         _sidebarDragGhost.GetComponent<RectTransform>().anchoredPosition = local + new Vector2(10f,-6f);
     }
 

@@ -133,23 +133,23 @@ public sealed class FsFolderPickerModal : MonoBehaviour
 
     private void PopulateFolderList()
     {
-        var fs = FileSystemManager.Instance;
+        var fs = FileExplorerManager.Instance;
         if (fs == null) return;
         foreach (var r in _rowPool) r.SetActive(false);
         int idx = 0;
-        foreach (var sidebarRoot in FileSystemManager.SidebarRoots)
+        foreach (var sidebarRoot in FileExplorerManager.SidebarRoots)
         {
             string rootPath = "/" + sidebarRoot;
             AddRow(ref idx, rootPath, sidebarRoot, 0, fs);
             foreach (var child in fs.GetChildren(rootPath))
             {
-                if (child.type != FileSystemManager.EntryType.Folder) continue;
+                if (child.type != FileExplorerManager.EntryType.Folder) continue;
                 AddRow(ref idx, child.fullPath, child.name, 1, fs);
             }
         }
     }
 
-    private void AddRow(ref int idx, string path, string displayName, int indent, FileSystemManager fs)
+    private void AddRow(ref int idx, string path, string displayName, int indent, FileExplorerManager fs)
     {
         if (!string.IsNullOrEmpty(_sourcePath) &&
             (path == _sourcePath || path.StartsWith(_sourcePath + "/", System.StringComparison.Ordinal)))

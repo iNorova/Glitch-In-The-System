@@ -8,9 +8,9 @@ using UnityEngine;
 /// Batch 7: added Sticky Notes folder, app shortcuts on Desktop, Screenshots under Pictures.
 /// Upgrade: NotifyChanged() now called after every mutation so FileExplorerApp.OnFsChanged fires.
 /// </summary>
-public sealed class FileSystemManager : MonoBehaviour
+public sealed class FileExplorerManager : MonoBehaviour
 {
-    public static FileSystemManager Instance { get; private set; }
+    public static FileExplorerManager Instance { get; private set; }
 
     /// <summary>Fired whenever the virtual FS changes (create/rename/delete/register).</summary>
     public event System.Action OnChanged;

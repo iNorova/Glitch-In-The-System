@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Captures a region of the screen into a Texture2D and displays it in a RawImage.
-/// Saves screenshots to the game FS (persistentDataPath) and registers them in FileSystemManager.
+/// Saves screenshots to the game FS (persistentDataPath) and registers them in FileExplorerManager.
 ///
 /// Coordinate system (verified at runtime):
 ///   SnippingOverlay is a plain child of FakeDesktop (no own Canvas).
@@ -40,7 +40,7 @@ public sealed class SnippingCapture : MonoBehaviour
     // Cleared on DeleteCapture() and replaced on each new capture.
     private byte[] _lastPngBytes;
 
-    // Name of a screenshot whose FileSystemManager registration is pending
+    // Name of a screenshot whose FileExplorerManager registration is pending
     // (set by background thread, consumed on main thread in LateUpdate).
     private volatile string _pendingRegistration;
 
@@ -50,11 +50,13 @@ public sealed class SnippingCapture : MonoBehaviour
         if (pending == null) return;
         _pendingRegistration = null; // consume before registering (idempotent)
 
-        var entry = FileSystemManager.Instance?.RegisterScreenshot(pending);
+        var entry = FileExplorerManager.Instance?.RegisterScreenshot(pending);
         if (entry != null)
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[SnippingCapture] Registered in Pictures/Screenshots: {entry.name}");
+            #endif
         else
-            Debug.LogWarning("[SnippingCapture] RegisterScreenshot: FileSystemManager not found or folder missing.");
+            Debug.LogWarning("[SnippingCapture] RegisterScreenshot: FileExplorerManager not found or folder missing.");
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -78,7 +80,9 @@ public sealed class SnippingCapture : MonoBehaviour
 
         float scaleFactor = sourceCanvas != null ? sourceCanvas.scaleFactor : 1f;
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[SnippingCapture] INPUT rect=({canvasLocalRect.x:F1},{canvasLocalRect.y:F1},{canvasLocalRect.width:F1},{canvasLocalRect.height:F1})  scaleFactor={scaleFactor}  Screen={Screen.width}x{Screen.height}");
+        #endif
 
         int screenX = Mathf.RoundToInt(canvasLocalRect.x * scaleFactor + Screen.width  * 0.5f);
         int screenY = Mathf.RoundToInt(canvasLocalRect.y * scaleFactor + Screen.height * 0.5f);
@@ -90,7 +94,9 @@ public sealed class SnippingCapture : MonoBehaviour
         capW    = Mathf.Clamp(capW, 1, Screen.width  - screenX);
         capH    = Mathf.Clamp(capH, 1, Screen.height - screenY);
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[SnippingCapture] CAPTURE screenX={screenX} screenY={screenY} capW={capW} capH={capH}");
+        #endif
 
         if (capW < 1 || capH < 1)
         {
@@ -120,7 +126,9 @@ public sealed class SnippingCapture : MonoBehaviour
             }
         }
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[SnippingCapture] Captured {capW}x{capH} at screen ({screenX},{screenY}).");
+        #endif
 
         // EncodeToPNG must run on the main thread (Unity API reads native texture data).
         // Do it here — this is the only encode in the entire capture pipeline.
@@ -142,7 +150,7 @@ public sealed class SnippingCapture : MonoBehaviour
                 Directory.CreateDirectory(saveFolder);
                 File.WriteAllBytes(Path.Combine(saveFolder, autoBaseName + ".png"), pngBytes);
 
-                // FileSystemManager.RegisterScreenshot must run on the main thread.
+                // FileExplorerManager.RegisterScreenshot must run on the main thread.
                 // Signal LateUpdate to call it next frame.
                 _pendingRegistration = autoBaseName;
             }
@@ -174,11 +182,13 @@ public sealed class SnippingCapture : MonoBehaviour
             Directory.CreateDirectory(folder);
             File.WriteAllBytes(Path.Combine(folder, baseName + ".png"), png);
 
-            var entry = FileSystemManager.Instance?.RegisterScreenshot(baseName);
+            var entry = FileExplorerManager.Instance?.RegisterScreenshot(baseName);
             if (entry != null)
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"[SnippingCapture] SaveCapture → registered '{entry.name}' in Pictures/Screenshots");
+                #endif
             else
-                Debug.LogWarning("[SnippingCapture] SaveCapture — FileSystemManager not found or folder missing.");
+                Debug.LogWarning("[SnippingCapture] SaveCapture — FileExplorerManager not found or folder missing.");
         }
         catch (System.Exception ex)
         {
@@ -200,7 +210,9 @@ public sealed class SnippingCapture : MonoBehaviour
         _lastPngBytes = null;
 
         SetActionButtonsInteractable(false);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("[SnippingCapture] Capture deleted.");
+        #endif
     }
 
     private void SetActionButtonsInteractable(bool interactable)

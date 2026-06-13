@@ -229,6 +229,10 @@ public sealed class FsContextMenu : MonoBehaviour
 
         if (isSep) return;
 
+        // FIX-3: reset hover visuals before reuse — OnPointerExit won't fire on reopen
+        var hoverComp = go.GetComponent<ContextMenuItemHover>();
+        if (hoverComp != null) hoverComp.ResetVisuals();
+
         // Update label
         var tmp = go.GetComponentInChildren<TextMeshProUGUI>(true);
         if (tmp != null) tmp.text = label;
@@ -335,7 +339,10 @@ internal sealed class ContextMenuItemHover : MonoBehaviour,
         if (_lbl != null) _lbl.color = TxtHover;
     }
 
-    public void OnPointerExit(UnityEngine.EventSystems.PointerEventData e)
+    public void OnPointerExit(UnityEngine.EventSystems.PointerEventData e) => ResetVisuals();
+
+    /// <summary>FIX-3: explicit reset — called by UpdatePooledItem on reuse.</summary>
+    public void ResetVisuals()
     {
         if (_bg  != null) _bg.color  = new Color(1f,1f,1f,0f);
         if (_lbl != null) _lbl.color = TxtNormal;

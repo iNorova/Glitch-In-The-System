@@ -2,28 +2,45 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using GlitchInTheSystem.UI;   // DragPanel namespace
 
 /// <summary>
-/// Attach to the same GO as SnippingCapture (SnippingToolAppWindow).
+/// Attach to SnippingToolAppWindow alongside SnippingCapture.
 ///
-/// Wires a click on PreviewImage → opens a fullscreen modal showing
-/// the captured Texture2D at its native resolution inside an AspectRatioFitter.
+/// Clicking the small PreviewImage OR calling OpenModal(texture) opens a separate
+/// draggable preview window that matches the desktop window style exactly:
+///   - Same WindowAnimator open/close animation (scale + fade)
+///   - DragPanel on TopBar for free dragging
+///   - SimpleAppWindow for correct z-order management
+///   - Centered on open, movable afterward
+///   - Close button + ESC to dismiss
 ///
-/// Also exposes OpenModal(Texture2D) so FsAppRouter can open any PNG file
-/// in preview mode without routing to Paint.
+/// PUBLIC API is unchanged - FsAppRouter can call OpenModal(Texture2D) as before.
+/// ZERO changes to SnippingCapture, SnippingToolApp, or FsAppRouter.
 ///
-/// ESC or the X button closes the modal.
+/// The preview window is built once and reused - texture swapped on each open.
 /// </summary>
 [RequireComponent(typeof(SnippingCapture))]
 public sealed class SnippingExpandPreview : MonoBehaviour
 {
-    [Tooltip("The RawImage that shows the small preview. Clicking it opens the modal.")]
+    [Tooltip("The RawImage that shows the small preview. Clicking it opens the preview window.")]
     [SerializeField] private RawImage previewImage;
 
     private SnippingCapture _capture;
-    private GameObject      _modal;
-    private RawImage        _modalImage;
 
+    // Persistent window objects - built once, reused every open.
+    private GameObject      _windowShell;   // FakeDesktop-level shell (like "Snipping Tool" GO)
+    private GameObject      _windowRoot;    // the actual window GO - has WindowAnimator, SimpleAppWindow
+    private RawImage        _previewImg;    // RawImage inside the window body
+    private AspectRatioFitter _fitter;
+    private WindowAnimator  _animator;
+    private SimpleAppWindow _appWindow;
+    private TMPro.TextMeshProUGUI _titleTMP;
+    private ResizableWindow       _resizable;
+    private string                _lastFileName;
+    private Texture2D             _ownedPreviewTexture; // textures loaded by FsAppRouter; we destroy these
+
+    // -- Lifecycle ----------------------------------------------------------
     private void Awake()
     {
         _capture = GetComponent<SnippingCapture>();
@@ -33,6 +50,7 @@ public sealed class SnippingExpandPreview : MonoBehaviour
     {
         if (previewImage != null)
         {
+            // Wire click on the inline preview → open the preview window
             var trigger = previewImage.gameObject.GetComponent<EventTrigger>()
                           ?? previewImage.gameObject.AddComponent<EventTrigger>();
             var entry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
@@ -44,116 +62,274 @@ public sealed class SnippingExpandPreview : MonoBehaviour
 
     private void Update()
     {
-        if (_modal != null && _modal.activeSelf
+        // ESC closes the preview window if it is open and this window is in focus
+        if (_windowRoot != null && _windowRoot.activeSelf
             && Keyboard.current != null
             && Keyboard.current.escapeKey.wasPressedThisFrame)
             CloseModal();
     }
 
-    // ── Public API ────────────────────────────────────────────────────────
-
-    /// Open modal with the last snip capture (called by preview click).
+    // -- Public API ---------------------------------------------------------
+    /// Open preview window with the last snip capture (called by preview click).
     public void OpenModal()
     {
         if (_capture == null || _capture.LastCapture == null) return;
+        // Use the timestamp as the filename for snipping-tool captures
+        _lastFileName = $"Snip_{System.DateTime.Now:yyyy-MM-dd_HH-mm-ss}.png";
         OpenModal(_capture.LastCapture);
     }
 
-    /// Open modal with any external texture (called by FsAppRouter for PNG files).
+    /// Open preview window with any external texture (called by FsAppRouter for PNG files).
     public void OpenModal(Texture2D texture)
     {
         if (texture == null) return;
 
-        EnsureModalBuilt();
-
-        _modalImage.texture = texture;
-
-        var fitter = _modalImage.GetComponent<AspectRatioFitter>();
-        if (fitter != null)
+        // Destroy the previously owned texture before assigning a new one.
+        // Only textures loaded externally (FsAppRouter) are owned here.
+        // _capture.LastCapture is managed by SnippingCapture — never destroy it here.
+        bool isSnipCapture = _capture != null && texture == _capture.LastCapture;
+        if (!isSnipCapture)
         {
-            fitter.aspectMode  = AspectRatioFitter.AspectMode.FitInParent;
-            fitter.aspectRatio = (float)texture.width / texture.height;
+            if (_ownedPreviewTexture != null && _ownedPreviewTexture != texture)
+            {
+                Destroy(_ownedPreviewTexture);
+                _ownedPreviewTexture = null;
+            }
+            _ownedPreviewTexture = texture;
         }
 
-        _modal.SetActive(true);
-        _modal.transform.SetAsLastSibling();
+        EnsureWindowBuilt();
+        if (_windowShell == null) return; // FakeDesktop not found
+
+
+        // Update texture + aspect ratio
+        _previewImg.texture = texture;
+        if (_fitter != null)
+        {
+            _fitter.aspectMode  = AspectRatioFitter.AspectMode.FitInParent;
+            _fitter.aspectRatio = (float)texture.width / Mathf.Max(1, texture.height);
+        }
+
+        // Update title: prefer explicit filename, fall back to dimensions
+        if (_titleTMP != null)
+        {
+            _titleTMP.text = !string.IsNullOrEmpty(_lastFileName)
+                ? _lastFileName
+                : $"Preview - {texture.width}\u00d7{texture.height}";
+        }
+
+        // Open via WindowAnimator - matches every other desktop window animation exactly.
+        // SimpleAppWindow.OpenIfClosed() handles: EnsureActive, BringToFront, AnimateOpen.
+        // Check parent chain before OpenIfClosed
+        _appWindow.OpenIfClosed();
+
+        // If already open (e.g. FsAppRouter called again), just bring to front + swap texture.
+        _windowRoot.transform.SetAsLastSibling();
+    }
+
+    /// Open preview with an explicit filename shown in the title bar.
+    public void OpenModal(Texture2D texture, string fileName)
+    {
+        _lastFileName = fileName;
+        OpenModal(texture);
     }
 
     public void CloseModal()
     {
-        if (_modal != null) _modal.SetActive(false);
+        if (_appWindow != null) _appWindow.Close();
     }
 
-    // ── Modal builder ─────────────────────────────────────────────────────
-    private void EnsureModalBuilt()
+    // -- Lifecycle (owned texture cleanup)
+    private void OnDestroy()
     {
-        if (_modal != null) return;
+        if (_ownedPreviewTexture != null)
+        {
+            Destroy(_ownedPreviewTexture);
+            _ownedPreviewTexture = null;
+        }
+    }
 
-        var fakeDesktop = FindFakeDesktop();
-        if (fakeDesktop == null) { Debug.LogError("[SnippingExpandPreview] FakeDesktop not found."); return; }
+    // -- Window builder -----------------------------------------------------
+    /// Builds the preview window once, parented to FakeDesktop at app-shell level.
+    /// Hierarchy mirrors every other desktop app:
+    ///   FakeDesktop
+    ///     SnipPreview [shell, stretch-fill, no components]
+    ///       SnipPreviewWindow [WindowAnimator, SimpleAppWindow, CanvasGroup, Image(bg)]
+    ///         FloatingPanel [Image(panel)]
+    ///           TopBar [Image, DragPanel, HLG] → TitleText + CloseButton
+    ///           Body   [Image, padding] → ImageContainer → RawImage + AspectRatioFitter
+    private void EnsureWindowBuilt()
+    {
+        if (_windowRoot != null) return;
 
-        // Backdrop
-        _modal = new GameObject("SnippingExpandModal");
-        _modal.transform.SetParent(fakeDesktop.transform, false);
-        _modal.layer = LayerMask.NameToLayer("UI");
-        var modalRT = _modal.AddComponent<RectTransform>();
-        modalRT.anchorMin = Vector2.zero; modalRT.anchorMax = Vector2.one;
-        modalRT.offsetMin = modalRT.offsetMax = Vector2.zero;
-        _modal.AddComponent<CanvasRenderer>();
-        var bg = _modal.AddComponent<Image>();
-        bg.color = new Color(0f, 0f, 0f, 0.92f);
-        bg.raycastTarget = true;
+        var fd = FindFakeDesktop();
+        if (fd == null) { Debug.LogError("[SnippingExpandPreview] FakeDesktop not found."); return; }
+
+        int uiLayer = LayerMask.NameToLayer("UI");
+        const float W = 960f;   // ~half of 1920×1080
+        const float H = 540f;
+
+        // -- Shell (stretch-fill, no components - matches other app shells) --
+        _windowShell = MakeGO("SnipPreview", fd.transform, uiLayer);
+        SetRT(_windowShell, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Vector2(0.5f, 0.5f));
+
+        // -- Window root (WindowAnimator + SimpleAppWindow + CanvasGroup) ---
+        _windowRoot = MakeGO("SnipPreviewWindow", _windowShell.transform, uiLayer);
+        SetRT(_windowRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+              Vector2.zero, new Vector2(W, H), new Vector2(0.5f, 0.5f));
+
+        var rootImg = _windowRoot.AddComponent<Image>();
+        rootImg.color = new Color(0f, 0f, 0f, 0f); // transparent root - FloatingPanel provides the bg
+        rootImg.raycastTarget = false;
+
+        _windowRoot.AddComponent<CanvasGroup>(); // required by WindowAnimator
+
+        // -- Deactivate BEFORE AddComponent so Awake() is deferred ----------
+        // SimpleAppWindow.Awake() fires synchronously on AddComponent if the GO is active.
+        // At that moment our serialized fields aren't set yet → EnsureInit() falls back
+        // to windowRoot=self with wrong cached values that are never corrected.
+        // Deactivating first means Awake() runs on the FIRST SetActive(true) call,
+        // by which time reflection has already written the correct field values.
+        _windowRoot.SetActive(false);
+
+        _animator   = _windowRoot.AddComponent<WindowAnimator>();   // Awake deferred
+        _appWindow  = _windowRoot.AddComponent<SimpleAppWindow>();  // Awake deferred
+        _resizable  = _windowRoot.AddComponent<ResizableWindow>();  // resize from edges
+
+        // Set serialized fields via reflection before first activation.
+        var rbf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public;
+        var windowRootField  = typeof(SimpleAppWindow).GetField("windowRoot",  rbf);
+        var startClosedField = typeof(SimpleAppWindow).GetField("startClosed", rbf);
+        windowRootField? .SetValue(_appWindow, _windowRoot);
+        startClosedField?.SetValue(_appWindow, true);
+
+        // Wire ResizableWindow — mirrors StickyNotesAppWindow setup
+        if (_resizable != null)
+        {
+            var rwRbf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+                      | System.Reflection.BindingFlags.Public;
+            typeof(ResizableWindow).GetField("windowRect",  rwRbf)?.SetValue(_resizable, _windowRoot.GetComponent<RectTransform>());
+            typeof(ResizableWindow).GetField("minWidth",    rwRbf)?.SetValue(_resizable, 480f);
+            typeof(ResizableWindow).GetField("minHeight",   rwRbf)?.SetValue(_resizable, 270f);
+            typeof(ResizableWindow).GetField("handleSize",  rwRbf)?.SetValue(_resizable, 18f);
+        }
+
+        // -- FloatingPanel -------------------------------------------------
+        var fp = MakeGO("FloatingPanel", _windowRoot.transform, uiLayer);
+        SetRT(fp, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Vector2(0.5f, 0.5f));
+        AddImage(fp, new Color(0.14f, 0.14f, 0.18f, 1f));
+
+        // -- TopBar --------------------------------------------------------
+        var topBar = MakeGO("TopBar", fp.transform, uiLayer);
+        SetRT(topBar, new Vector2(0f, 1f), new Vector2(1f, 1f),
+              Vector2.zero, new Vector2(0f, 32f), new Vector2(0.5f, 1f));
+        AddImage(topBar, new Color(0f, 0f, 0.502f, 1f));
+
+        // DragPanel - target is the window root so dragging moves the whole window
+        var dp = topBar.AddComponent<DragPanel>();
+        dp.SetTarget(_windowRoot.GetComponent<RectTransform>());
+
+        // HLG for TopBar children
+        var hlg = topBar.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding               = new RectOffset(10, 4, 0, 0);
+        hlg.spacing               = 4;
+        hlg.childAlignment        = TextAnchor.MiddleLeft;
+        hlg.childControlWidth     = true;
+        hlg.childControlHeight    = true;
+        hlg.childForceExpandWidth = false;
+        hlg.childForceExpandHeight= true;
+
+        // Title label
+        var titleGO = MakeGO("TitleText", topBar.transform, uiLayer);
+        var titleLE = titleGO.AddComponent<LayoutElement>();
+        titleLE.flexibleWidth  = 1f;
+        titleLE.flexibleHeight = 1f;
+        _titleTMP = titleGO.AddComponent<TMPro.TextMeshProUGUI>();
+        _titleTMP.text      = "Preview";
+        _titleTMP.fontSize  = 12f;
+        _titleTMP.fontStyle = TMPro.FontStyles.Normal;
+        _titleTMP.color     = Color.white;
+        _titleTMP.alignment = TMPro.TextAlignmentOptions.MidlineLeft;
+        _titleTMP.raycastTarget = false;
 
         // Close button
-        var closeGO = new GameObject("CloseButton");
-        closeGO.transform.SetParent(_modal.transform, false);
-        closeGO.layer = LayerMask.NameToLayer("UI");
-        var closeRT = closeGO.AddComponent<RectTransform>();
-        closeRT.anchorMin = new Vector2(1f, 1f); closeRT.anchorMax = new Vector2(1f, 1f);
-        closeRT.pivot = new Vector2(1f, 1f);
-        closeRT.anchoredPosition = new Vector2(-12f, -12f); closeRT.sizeDelta = new Vector2(36f, 36f);
-        closeGO.AddComponent<CanvasRenderer>();
-        closeGO.AddComponent<Image>().color = new Color(0.25f, 0.25f, 0.25f, 1f);
-        closeGO.AddComponent<Button>().onClick.AddListener(CloseModal);
-        var closeLbl = new GameObject("Label");
-        closeLbl.transform.SetParent(closeGO.transform, false);
-        var clRT = closeLbl.AddComponent<RectTransform>();
+        var closeBtnGO = MakeGO("CloseButton", topBar.transform, uiLayer);
+        var closeBtnLE = closeBtnGO.AddComponent<LayoutElement>();
+        closeBtnLE.preferredWidth  = 32f; closeBtnLE.flexibleWidth  = 0f;
+        closeBtnLE.preferredHeight = 24f; closeBtnLE.flexibleHeight = 0f;
+        AddImage(closeBtnGO, new Color(0.70f, 0.10f, 0.10f, 1f));
+        var closeBtn = closeBtnGO.AddComponent<Button>();
+        closeBtn.onClick.AddListener(CloseModal);
+        var closeLblGO = MakeGO("Label", closeBtnGO.transform, uiLayer);
+        var clRT = closeLblGO.GetComponent<RectTransform>(); // MakeGO already added RT - AddComponent returns null
         clRT.anchorMin = Vector2.zero; clRT.anchorMax = Vector2.one;
         clRT.offsetMin = clRT.offsetMax = Vector2.zero;
-        var clTMP = closeLbl.AddComponent<TMPro.TextMeshProUGUI>();
-        clTMP.text = "X"; clTMP.fontSize = 18f; clTMP.color = Color.white;
+        var clTMP = closeLblGO.AddComponent<TMPro.TextMeshProUGUI>();
+        clTMP.text = "X"; clTMP.fontSize = 13f; clTMP.color = Color.white;
         clTMP.alignment = TMPro.TextAlignmentOptions.Center; clTMP.raycastTarget = false;
 
-        // Image container
-        var imgContainer = new GameObject("ImageContainer");
-        imgContainer.transform.SetParent(_modal.transform, false);
-        imgContainer.layer = LayerMask.NameToLayer("UI");
-        var icRT = imgContainer.AddComponent<RectTransform>();
-        icRT.anchorMin = Vector2.zero; icRT.anchorMax = Vector2.one;
-        icRT.offsetMin = new Vector2(48f, 48f); icRT.offsetMax = new Vector2(-48f, -48f);
+        // -- Body ----------------------------------------------------------
+        var body = MakeGO("Body", fp.transform, uiLayer);
+        SetRT(body, new Vector2(0f, 0f), new Vector2(1f, 1f),
+              new Vector2(0f, -16f), new Vector2(0f, -32f), new Vector2(0.5f, 0.5f));
+        AddImage(body, new Color(0.10f, 0.10f, 0.13f, 1f));
 
-        // RawImage
-        var imgGO = new GameObject("ExpandedImage");
-        imgGO.transform.SetParent(imgContainer.transform, false);
-        imgGO.layer = LayerMask.NameToLayer("UI");
-        var imgRT = imgGO.AddComponent<RectTransform>();
-        imgRT.anchorMin = Vector2.zero; imgRT.anchorMax = Vector2.one;
-        imgRT.offsetMin = imgRT.offsetMax = Vector2.zero;
-        imgGO.AddComponent<CanvasRenderer>();
-        _modalImage = imgGO.AddComponent<RawImage>();
-        _modalImage.color = Color.white; _modalImage.raycastTarget = false;
-        var fitter = imgGO.AddComponent<AspectRatioFitter>();
-        fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        // Image container - 12px padding inside body
+        var imgContainer = MakeGO("ImageContainer", body.transform, uiLayer);
+        SetRT(imgContainer, Vector2.zero, Vector2.one,
+              Vector2.zero, new Vector2(-24f, -24f), new Vector2(0.5f, 0.5f));
 
-        _modal.SetActive(false);
+        // RawImage + AspectRatioFitter - fills container, preserves ratio
+        var imgGO = MakeGO("PreviewImage", imgContainer.transform, uiLayer);
+        SetRT(imgGO, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Vector2(0.5f, 0.5f));
+        _previewImg = imgGO.AddComponent<RawImage>();
+        _previewImg.color = Color.white;
+        _previewImg.raycastTarget = false;
+        _fitter = imgGO.AddComponent<AspectRatioFitter>();
+        _fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+
+        // Start hidden - SimpleAppWindow.startClosed handles this via SetActive(false) in Awake
+        _windowRoot.SetActive(false);
+    }
+
+    // -- Static helpers -----------------------------------------------------
+    private static GameObject MakeGO(string goName, Transform parent, int layer)
+    {
+        var go = new GameObject(goName);
+        go.layer = layer;
+        go.transform.SetParent(parent, false);
+        go.AddComponent<RectTransform>();
+        return go;
+    }
+
+    private static void SetRT(GameObject go,
+        Vector2 anchorMin, Vector2 anchorMax,
+        Vector2 anchoredPos, Vector2 sizeDelta, Vector2 pivot)
+    {
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin        = anchorMin;
+        rt.anchorMax        = anchorMax;
+        rt.pivot            = pivot;
+        rt.anchoredPosition = anchoredPos;
+        rt.sizeDelta        = sizeDelta;
+    }
+
+    private static Image AddImage(GameObject go, Color color)
+    {
+        var img = go.AddComponent<Image>();
+        img.color = color;
+        img.raycastTarget = true;
+        return img;
     }
 
     private static GameObject FindFakeDesktop()
     {
-        foreach (var r in UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects())
+        foreach (var root in UnityEngine.SceneManagement.SceneManager.GetActiveScene()
+                                        .GetRootGameObjects())
         {
-            if (r.name == "FakeDesktop") return r;
-            var found = r.transform.Find("FakeDesktop");
+            if (root.name == "FakeDesktop") return root;
+            var found = root.transform.Find("FakeDesktop");
             if (found != null) return found.gameObject;
         }
         return null;

@@ -3,83 +3,143 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// Adds four corner drag-resize handles to a UI window RectTransform.
-/// Attach to PaintAppWindow. No Update() polling — purely event-driven.
+/// Adds eight resize handles to a UI window RectTransform:
+///   Four corners  (diagonal resize)  — CornerDragHandle
+///   Four edges    (single-axis resize) — EdgeDragHandle
 ///
-/// ROOT-CAUSE NOTES (why the original invisible-handle approach failed):
-///   1. Unity's GraphicRaycaster skips Image components whose rendered alpha is 0,
-///      regardless of raycastTarget=true. Handles with color=(0,0,0,0) were never hit.
-///   2. eventData.Use() in OnPointerDown consumed the event and prevented the
-///      EventSystem from starting a drag sequence for that pointer.
-/// FIXES applied here:
-///   1. Handle Image uses a very-low-opacity white so alpha > 0 and raycasts land.
-///      This simultaneously gives the subtle corner indicator the design requires.
-///   2. eventData.Use() removed from OnPointerDown.
-///   3. Canvas is cached from the handle itself (more robust than from windowRect).
+/// All handles are invisible hitboxes (alpha>0 required for GraphicRaycaster).
+/// Visual accent shown only on hover/active via a non-raycast child Image.
+///
+/// ROOT-CAUSE NOTES (why invisible-handle approach originally failed):
+///   1. Unity's GraphicRaycaster skips alpha=0 Images — handles need alpha > 0.
+///   2. eventData.Use() in OnPointerDown prevented drag sequences.
+/// Both fixed: handles use alpha=0.004 (above threshold), Use() removed.
 /// </summary>
 public sealed class ResizableWindow : MonoBehaviour
 {
     internal enum Corner { BottomLeft, BottomRight, TopLeft, TopRight }
+    internal enum Edge   { Left, Right, Bottom, Top }
 
     [Header("Resize settings")]
     [Tooltip("The RectTransform whose sizeDelta will be changed. Defaults to this GameObject.")]
-    [SerializeField] private RectTransform windowRect;
+    [SerializeField] internal RectTransform windowRect;
 
     [Tooltip("Minimum allowed window width in pixels.")]
-    [SerializeField] private float minWidth = 400f;
+    [SerializeField] internal float minWidth  = 400f;
 
     [Tooltip("Minimum allowed window height in pixels.")]
-    [SerializeField] private float minHeight = 300f;
+    [SerializeField] internal float minHeight = 300f;
 
-    [Tooltip("Size of the corner hit-area / visual indicator in pixels.")]
-    [SerializeField] private float handleSize = 20f;
+    [Tooltip("Corner hit-area size in pixels.")]
+    [SerializeField] private float cornerSize = 20f;
 
-    // Subtle white — just visible enough to hint at resizability.
-    // Alpha MUST be > 0 for Unity's GraphicRaycaster to register hits.
-    private static readonly Color HandleColor = new Color(1f, 1f, 1f, 0.18f);
+    [Tooltip("Edge hit-area thickness in pixels.")]
+    [SerializeField] private float edgeThickness = 8f;
+
+    // Minimum alpha for GraphicRaycaster to register — just above zero
+    private static readonly Color HitboxColor = new Color(1f, 1f, 1f, 0.004f);
 
     private void Awake()
     {
         if (windowRect == null)
             windowRect = GetComponent<RectTransform>();
 
-        CreateHandle(Corner.BottomLeft);
-        CreateHandle(Corner.BottomRight);
-        CreateHandle(Corner.TopLeft);
-        CreateHandle(Corner.TopRight);
+        // Four corners (diagonal)
+        CreateCorner(Corner.BottomLeft);
+        CreateCorner(Corner.BottomRight);
+        CreateCorner(Corner.TopLeft);
+        CreateCorner(Corner.TopRight);
+
+        // Four edges (single-axis)
+        CreateEdge(Edge.Left);
+        CreateEdge(Edge.Right);
+        CreateEdge(Edge.Bottom);
+        CreateEdge(Edge.Top);
     }
 
-    private void CreateHandle(Corner corner)
+    // ── Corner handles ────────────────────────────────────────────────────
+    private void CreateCorner(Corner corner)
     {
         var go = new GameObject($"ResizeHandle_{corner}",
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image),
-            typeof(CornerDragHandle));
-
+            typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(Image), typeof(LayoutElement), typeof(CornerDragHandle));
         go.transform.SetParent(windowRect, false);
-        go.transform.SetAsLastSibling(); // above FloatingPanel in draw order
+        go.transform.SetAsLastSibling();
+        go.GetComponent<LayoutElement>().ignoreLayout = true;
 
-        // FIX 1: alpha must be > 0 so GraphicRaycaster registers hits on this Image.
-        // 0.18 alpha gives a barely-there white corner glow — functional + decorative.
-        var img = go.GetComponent<Image>();
-        img.color = HandleColor;
-        img.raycastTarget = true;
+        SetupHitboxImage(go.GetComponent<Image>());
 
-        // Point-anchor the handle to its exact corner so it tracks during resize
-        var rt = go.GetComponent<RectTransform>();
         Vector2 anchor = CornerAnchor(corner);
-        rt.anchorMin         = anchor;
-        rt.anchorMax         = anchor;
-        rt.pivot             = anchor;
-        rt.sizeDelta         = new Vector2(handleSize, handleSize);
-        rt.anchoredPosition  = Vector2.zero;
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin        = anchor;
+        rt.anchorMax        = anchor;
+        rt.pivot            = anchor;
+        rt.sizeDelta        = new Vector2(cornerSize, cornerSize);
+        rt.anchoredPosition = Vector2.zero;
 
-        var handler = go.GetComponent<CornerDragHandle>();
-        handler.Initialize(windowRect, corner, minWidth, minHeight);
+        go.GetComponent<CornerDragHandle>().Initialize(this, corner);
     }
 
-    private static Vector2 CornerAnchor(Corner corner) => corner switch
+    // ── Edge handles ──────────────────────────────────────────────────────
+    private void CreateEdge(Edge edge)
+    {
+        var go = new GameObject($"ResizeHandle_{edge}",
+            typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(Image), typeof(LayoutElement), typeof(EdgeDragHandle));
+        go.transform.SetParent(windowRect, false);
+        go.transform.SetAsLastSibling();
+        go.GetComponent<LayoutElement>().ignoreLayout = true;
+
+        SetupHitboxImage(go.GetComponent<Image>());
+
+        var rt = go.GetComponent<RectTransform>();
+        SetEdgeRect(rt, edge);
+
+        go.GetComponent<EdgeDragHandle>().Initialize(this, edge);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    private static void SetupHitboxImage(Image img)
+    {
+        img.color         = HitboxColor; // > 0 so GraphicRaycaster registers hits
+        img.raycastTarget = true;
+    }
+
+    /// <summary>
+    /// Edge handle anchors: stretches along one axis, thin strip on the other.
+    /// Inset by cornerSize so corners take priority at intersections.
+    /// </summary>
+    private void SetEdgeRect(RectTransform rt, Edge edge)
+    {
+        float c = cornerSize;
+        float t = edgeThickness;
+
+        switch (edge)
+        {
+            case Edge.Left:
+                rt.anchorMin = new Vector2(0f, 0f);  rt.anchorMax = new Vector2(0f, 1f);
+                rt.pivot     = new Vector2(0f, 0.5f);
+                rt.offsetMin = new Vector2(0f,  c);   rt.offsetMax = new Vector2(t,  -c);
+                break;
+            case Edge.Right:
+                rt.anchorMin = new Vector2(1f, 0f);  rt.anchorMax = new Vector2(1f, 1f);
+                rt.pivot     = new Vector2(1f, 0.5f);
+                rt.offsetMin = new Vector2(-t, c);    rt.offsetMax = new Vector2(0f, -c);
+                break;
+            case Edge.Bottom:
+                rt.anchorMin = new Vector2(0f, 0f);  rt.anchorMax = new Vector2(1f, 0f);
+                rt.pivot     = new Vector2(0.5f, 0f);
+                rt.offsetMin = new Vector2(c,  0f);   rt.offsetMax = new Vector2(-c,  t);
+                break;
+            case Edge.Top:
+                rt.anchorMin = new Vector2(0f, 1f);  rt.anchorMax = new Vector2(1f, 1f);
+                rt.pivot     = new Vector2(0.5f, 1f);
+                rt.offsetMin = new Vector2(c, -t);    rt.offsetMax = new Vector2(-c, 0f);
+                break;
+        }
+    }
+
+    internal static Vector2 CornerAnchor(Corner corner) => corner switch
     {
         Corner.BottomLeft  => new Vector2(0f, 0f),
         Corner.BottomRight => new Vector2(1f, 0f),
@@ -89,146 +149,188 @@ public sealed class ResizableWindow : MonoBehaviour
     };
 }
 
-/// <summary>
-/// Drag handler for one resize corner. Event-driven, no Update().
-///
-/// Math: PaintAppWindow has pivot (0.5, 0.5) + point anchor in parent.
-///   Dragging a corner changes sizeDelta by (sign * delta).
-///   Since the pivot is centered, this also shifts the geometric center by half
-///   the size change, so anchoredPosition must move by (sign * delta / 2)
-///   to keep the opposite corner stationary.
-///
-/// Screen-boundary clamping: after applying resize, world corners are checked
-///   against 0–1920 (x) and 0–1080 (y). Any overshoot on the dragged edge
-///   shrinks the size by that amount and compensates position to keep the
-///   opposite edge stationary. No Update() loop — purely reactive in OnDrag.
-/// </summary>
+// ═════════════════════════════════════════════════════════════════════════════
+// Shared resize math — used by both CornerDragHandle and EdgeDragHandle
+// ═════════════════════════════════════════════════════════════════════════════
+internal static class ResizeMath
+{
+    private const float ScreenW = 1920f;
+    private const float ScreenH = 1080f;
+
+    /// <summary>
+    /// Apply a resize delta to windowRect.
+    /// signX: +1=right edge, -1=left edge, 0=no horizontal resize.
+    /// signY: +1=top  edge, -1=bottom edge, 0=no vertical resize.
+    /// </summary>
+    internal static void Apply(RectTransform windowRect, Canvas canvas,
+                               float signX, float signY,
+                               Vector2 screenDelta,
+                               float minWidth, float minHeight)
+    {
+        if (windowRect == null || canvas == null) return;
+
+        float sf = canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
+        Vector2 delta = screenDelta / sf;
+
+        Vector2 size = windowRect.sizeDelta;
+
+        float clampedW = signX != 0f ? Mathf.Max(minWidth,  size.x + signX * delta.x) : size.x;
+        float clampedH = signY != 0f ? Mathf.Max(minHeight, size.y + signY * delta.y) : size.y;
+
+        float actualDX = (clampedW - size.x) * signX;
+        float actualDY = (clampedH - size.y) * signY;
+
+        windowRect.sizeDelta        = new Vector2(clampedW, clampedH);
+        windowRect.anchoredPosition += new Vector2(actualDX * 0.5f, actualDY * 0.5f);
+
+        // Screen-boundary clamp
+        var wc = new Vector3[4];
+        windowRect.GetWorldCorners(wc);
+
+        if (signX != 0f)
+        {
+            float overX = signX > 0f ? Mathf.Max(0f, wc[2].x - ScreenW) : Mathf.Max(0f, -wc[0].x);
+            if (overX > 0f)
+            {
+                windowRect.sizeDelta = new Vector2(
+                    Mathf.Max(minWidth, windowRect.sizeDelta.x - overX),
+                    windowRect.sizeDelta.y);
+                windowRect.anchoredPosition -= new Vector2(signX * overX * 0.5f, 0f);
+            }
+        }
+        if (signY != 0f)
+        {
+            float overY = signY > 0f ? Mathf.Max(0f, wc[1].y - ScreenH) : Mathf.Max(0f, -wc[0].y);
+            if (overY > 0f)
+            {
+                windowRect.sizeDelta = new Vector2(
+                    windowRect.sizeDelta.x,
+                    Mathf.Max(minHeight, windowRect.sizeDelta.y - overY));
+                windowRect.anchoredPosition -= new Vector2(0f, signY * overY * 0.5f);
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Shared accent visuals helper
+// ═════════════════════════════════════════════════════════════════════════════
+internal static class ResizeAccent
+{
+    internal static readonly Color Normal = new Color(0.55f, 0.65f, 0.80f, 0.00f);
+    internal static readonly Color Hover  = new Color(0.55f, 0.65f, 0.90f, 0.55f);
+    internal static readonly Color Active = new Color(0.70f, 0.80f, 1.00f, 0.80f);
+
+    internal static Image Build(Transform parent, Vector2 size)
+    {
+        var go = new GameObject("ResizeAccent",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        go.transform.SetParent(parent, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f); rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = size;
+        rt.anchoredPosition = Vector2.zero;
+        var img = go.GetComponent<Image>();
+        img.color         = Normal;
+        img.raycastTarget = false;
+        return img;
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Corner drag handle (diagonal resize)
+// ═════════════════════════════════════════════════════════════════════════════
 [RequireComponent(typeof(RectTransform))]
 internal sealed class CornerDragHandle : MonoBehaviour,
     IPointerDownHandler, IDragHandler, IPointerUpHandler,
     IPointerEnterHandler, IPointerExitHandler
 {
     private RectTransform _windowRect;
-    private float         _minWidth;
-    private float         _minHeight;
-    private float         _signX;   // +1 = right edge,  -1 = left edge
-    private float         _signY;   // +1 = top edge,    -1 = bottom edge
+    private float         _minWidth, _minHeight;
+    private float         _signX, _signY;
     private Canvas        _canvas;
-    private Image         _image;
+    private Image         _accent;
 
-    // Game world bounds — matches the 1920x1080 camera setup
-    private const float ScreenW = 1920f;
-    private const float ScreenH = 1080f;
-
-    // Visual feedback colors
-    private static readonly Color NormalColor  = new Color(1f, 1f, 1f, 0.18f);
-    private static readonly Color HoverColor   = new Color(1f, 1f, 1f, 0.45f);
-    private static readonly Color ActiveColor  = new Color(1f, 1f, 1f, 0.65f);
-
-    internal void Initialize(RectTransform windowRect,
-                              ResizableWindow.Corner corner,
-                              float minWidth, float minHeight)
+    internal void Initialize(ResizableWindow owner, ResizableWindow.Corner corner)
     {
-        _windowRect = windowRect;
-        _minWidth   = minWidth;
-        _minHeight  = minHeight;
-
+        _windowRect = owner.windowRect;
+        _minWidth   = owner.minWidth;
+        _minHeight  = owner.minHeight;
         _signX = (corner == ResizableWindow.Corner.BottomRight ||
-                  corner == ResizableWindow.Corner.TopRight)  ? 1f : -1f;
-        _signY = (corner == ResizableWindow.Corner.TopLeft    ||
-                  corner == ResizableWindow.Corner.TopRight)  ? 1f : -1f;
+                  corner == ResizableWindow.Corner.TopRight)   ?  1f : -1f;
+        _signY = (corner == ResizableWindow.Corner.TopLeft     ||
+                  corner == ResizableWindow.Corner.TopRight)   ?  1f : -1f;
     }
 
     private void Start()
     {
-        // FIX 3: cache Canvas from this handle's own hierarchy — more reliable
-        // than walking from windowRect, and works correctly in all nesting cases.
         _canvas = GetComponentInParent<Canvas>();
-        _image  = GetComponent<Image>();
+        _accent = ResizeAccent.Build(transform, new Vector2(6f, 6f));
     }
 
-    // FIX 2: Do NOT call eventData.Use() here.
-    public void OnPointerDown(PointerEventData eventData)
+    public void OnPointerDown(PointerEventData e)
     {
-        if (_windowRect != null)
-            _windowRect.SetAsLastSibling();
-
-        if (_image != null)
-            _image.color = ActiveColor;
+        _windowRect?.SetAsLastSibling();
+        if (_accent) _accent.color = ResizeAccent.Active;
     }
 
-    public void OnDrag(PointerEventData eventData)
+    public void OnDrag(PointerEventData e) =>
+        ResizeMath.Apply(_windowRect, _canvas, _signX, _signY, e.delta, _minWidth, _minHeight);
+
+    public void OnPointerUp(PointerEventData e)   { if (_accent) _accent.color = ResizeAccent.Normal; }
+    public void OnPointerEnter(PointerEventData e) { if (_accent) _accent.color = ResizeAccent.Hover;  }
+    public void OnPointerExit(PointerEventData e)  { if (_accent) _accent.color = ResizeAccent.Normal; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Edge drag handle (single-axis resize)
+// ═════════════════════════════════════════════════════════════════════════════
+[RequireComponent(typeof(RectTransform))]
+internal sealed class EdgeDragHandle : MonoBehaviour,
+    IPointerDownHandler, IDragHandler, IPointerUpHandler,
+    IPointerEnterHandler, IPointerExitHandler
+{
+    private RectTransform _windowRect;
+    private float         _minWidth, _minHeight;
+    private float         _signX, _signY;
+    private Canvas        _canvas;
+    private Image         _accent;
+
+    internal void Initialize(ResizableWindow owner, ResizableWindow.Edge edge)
     {
-        if (_windowRect == null || _canvas == null) return;
+        _windowRect = owner.windowRect;
+        _minWidth   = owner.minWidth;
+        _minHeight  = owner.minHeight;
 
-        float scaleFactor = _canvas.scaleFactor > 0f ? _canvas.scaleFactor : 1f;
-        Vector2 delta = eventData.delta / scaleFactor;
-
-        Vector2 size = _windowRect.sizeDelta;
-
-        float newW = size.x + _signX * delta.x;
-        float newH = size.y + _signY * delta.y;
-
-        float clampedW = Mathf.Max(_minWidth,  newW);
-        float clampedH = Mathf.Max(_minHeight, newH);
-
-        // Actual applied delta after min-size clamping
-        float actualDX = (clampedW - size.x) * _signX;
-        float actualDY = (clampedH - size.y) * _signY;
-
-        _windowRect.sizeDelta        = new Vector2(clampedW, clampedH);
-        _windowRect.anchoredPosition += new Vector2(actualDX * 0.5f, actualDY * 0.5f);
-
-        // ── Screen-boundary clamp ─────────────────────────────────────────────
-        // GetWorldCorners order: 0=BottomLeft, 1=TopLeft, 2=TopRight, 3=BottomRight
-        var wc = new Vector3[4];
-        _windowRect.GetWorldCorners(wc);
-
-        // Measure how far the dragged edge has gone past the screen boundary.
-        // overX/overY are positive magnitudes; sign tells us which edge.
-        float overX = _signX > 0f
-            ? Mathf.Max(0f, wc[2].x - ScreenW)   // right edge past 1920
-            : Mathf.Max(0f, -wc[0].x);            // left  edge past 0
-
-        float overY = _signY > 0f
-            ? Mathf.Max(0f, wc[1].y - ScreenH)   // top   edge past 1080
-            : Mathf.Max(0f, -wc[0].y);            // bottom edge past 0
-
-        // Shrink the dragged edge back by the overshoot amount and move
-        // the center toward the dragged edge so the OPPOSITE edge stays put.
-        if (overX > 0f)
+        // Edges only resize on one axis
+        switch (edge)
         {
-            float shrink = overX;
-            _windowRect.sizeDelta = new Vector2(
-                Mathf.Max(_minWidth, _windowRect.sizeDelta.x - shrink),
-                _windowRect.sizeDelta.y);
-            _windowRect.anchoredPosition -= new Vector2(_signX * shrink * 0.5f, 0f);
-        }
-        if (overY > 0f)
-        {
-            float shrink = overY;
-            _windowRect.sizeDelta = new Vector2(
-                _windowRect.sizeDelta.x,
-                Mathf.Max(_minHeight, _windowRect.sizeDelta.y - shrink));
-            _windowRect.anchoredPosition -= new Vector2(0f, _signY * shrink * 0.5f);
+            case ResizableWindow.Edge.Left:   _signX = -1f; _signY = 0f; break;
+            case ResizableWindow.Edge.Right:  _signX =  1f; _signY = 0f; break;
+            case ResizableWindow.Edge.Bottom: _signX =  0f; _signY = -1f; break;
+            case ResizableWindow.Edge.Top:    _signX =  0f; _signY =  1f; break;
         }
     }
 
-    public void OnPointerUp(PointerEventData eventData)
+    private void Start()
     {
-        if (_image != null)
-            _image.color = NormalColor;
+        _canvas = GetComponentInParent<Canvas>();
+        // Thin accent bar: horizontal for top/bottom edges, vertical for left/right
+        Vector2 accentSize = (_signX == 0f) ? new Vector2(40f, 2f) : new Vector2(2f, 40f);
+        _accent = ResizeAccent.Build(transform, accentSize);
     }
 
-    public void OnPointerEnter(PointerEventData eventData)
+    public void OnPointerDown(PointerEventData e)
     {
-        if (_image != null)
-            _image.color = HoverColor;
+        _windowRect?.SetAsLastSibling();
+        if (_accent) _accent.color = ResizeAccent.Active;
     }
 
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (_image != null)
-            _image.color = NormalColor;
-    }
+    public void OnDrag(PointerEventData e) =>
+        ResizeMath.Apply(_windowRect, _canvas, _signX, _signY, e.delta, _minWidth, _minHeight);
+
+    public void OnPointerUp(PointerEventData e)    { if (_accent) _accent.color = ResizeAccent.Normal; }
+    public void OnPointerEnter(PointerEventData e)  { if (_accent) _accent.color = ResizeAccent.Hover;  }
+    public void OnPointerExit(PointerEventData e)   { if (_accent) _accent.color = ResizeAccent.Normal; }
 }

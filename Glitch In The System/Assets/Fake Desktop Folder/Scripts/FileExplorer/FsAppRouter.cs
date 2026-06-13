@@ -20,7 +20,7 @@ public static class FsAppRouter
     private const string LnkSocialMedia = "Social Media.lnk";
     private const string LnkWorkDash    = "Work Dashboard.lnk";
 
-    public static void OpenFile(FileSystemManager.FsEntry entry)
+    public static void OpenFile(FileExplorerManager.FsEntry entry)
     {
         if (entry == null) return;
 
@@ -51,7 +51,7 @@ public static class FsAppRouter
     }
 
     // ── Image preview — view only, never opens Paint ──────────────────────
-    private static void OpenImageFile(FileSystemManager.FsEntry entry)
+    private static void OpenImageFile(FileExplorerManager.FsEntry entry)
     {
         // Load from persistentDataPath/Screenshots
         string filePath = Path.Combine(
@@ -76,7 +76,7 @@ public static class FsAppRouter
             return;
         }
 
-        DesktopLauncherHub.OpenImagePreview(texture);
+        DesktopLauncherHub.OpenImagePreview(texture, entry.name);
     }
 
     // ── App shortcuts ─────────────────────────────────────────────────────
