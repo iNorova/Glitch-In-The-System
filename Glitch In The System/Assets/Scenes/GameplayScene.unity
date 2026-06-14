@@ -4827,6 +4827,7 @@ MonoBehaviour:
   folderIcon: {fileID: -1703395926225513711, guid: 12cf37577bca24249880438b32974a85, type: 3}
   fileIcon: {fileID: -47303514400051587, guid: eba50d077bef5c847aa4e3f6ac24ccd3, type: 3}
   refreshButton: {fileID: 1718474714}
+  statusLabel: {fileID: 0}
 --- !u!114 &320855442
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4842,7 +4843,8 @@ MonoBehaviour:
   windowRect: {fileID: 320855439}
   minWidth: 480
   minHeight: 340
-  handleSize: 20
+  cornerSize: 20
+  edgeThickness: 8
 --- !u!114 &320855443
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9282,6 +9284,7 @@ GameObject:
   - component: {fileID: 612014105}
   - component: {fileID: 612014107}
   - component: {fileID: 612014106}
+  - component: {fileID: 612014108}
   m_Layer: 0
   m_Name: PathLabel
   m_TagString: Untagged
@@ -9408,6 +9411,26 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 612014104}
   m_CullTransparentMesh: 1
+--- !u!114 &612014108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 612014104}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
+  m_IgnoreLayout: 1
+  m_MinWidth: -1
+  m_MinHeight: -1
+  m_PreferredWidth: -1
+  m_PreferredHeight: -1
+  m_FlexibleWidth: -1
+  m_FlexibleHeight: -1
+  m_LayoutPriority: 1
 --- !u!1 &622038249
 GameObject:
   m_ObjectHideFlags: 0
@@ -13570,7 +13593,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d66ba4213c2905b4cae5e7b08710858a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SimpleAppWindow
-  windowRoot: {fileID: 465742968}
+  windowRoot: {fileID: 831544701}
   startClosed: 1
   openActsAsToggleWhenAlreadyOpen: 1
 --- !u!114 &831544705
@@ -13654,7 +13677,8 @@ MonoBehaviour:
   windowRect: {fileID: 0}
   minWidth: 400
   minHeight: 300
-  handleSize: 18
+  cornerSize: 20
+  edgeThickness: 8
 --- !u!1 &834612618
 GameObject:
   m_ObjectHideFlags: 0
@@ -22389,6 +22413,7 @@ GameObject:
   - component: {fileID: 1411273703}
   - component: {fileID: 1411273705}
   - component: {fileID: 1411273704}
+  - component: {fileID: 1411273706}
   m_Layer: 0
   m_Name: __BorderLeft
   m_TagString: Untagged
@@ -22453,6 +22478,26 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1411273702}
   m_CullTransparentMesh: 1
+--- !u!114 &1411273706
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1411273702}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
+  m_IgnoreLayout: 1
+  m_MinWidth: -1
+  m_MinHeight: -1
+  m_PreferredWidth: -1
+  m_PreferredHeight: -1
+  m_FlexibleWidth: -1
+  m_FlexibleHeight: -1
+  m_LayoutPriority: 1
 --- !u!1 &1416187960
 GameObject:
   m_ObjectHideFlags: 0
@@ -25914,7 +25959,8 @@ MonoBehaviour:
   windowRect: {fileID: 1568366892}
   minWidth: 300
   minHeight: 240
-  handleSize: 20
+  cornerSize: 20
+  edgeThickness: 8
 --- !u!1 &1582834741
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,6 +23,8 @@ public sealed class FsContextMenu : MonoBehaviour
     private RectTransform _windowRect; // for boundary clamping
     private bool          _open;
     private bool          _panelBuilt;
+    private CanvasGroup   _panelCG;    // for open animation (alpha)
+    private Coroutine     _openAnim;   // stop/restart guard
     private Vector2       _cursorLocal;
 
     private readonly List<(string label, Action action)> _items = new();
@@ -77,6 +80,10 @@ public sealed class FsContextMenu : MonoBehaviour
         _panel.SetAsLastSibling();
         _open = true;
         ClampPanelToWindow();
+
+        // Stop any in-progress open animation before starting a new one.
+        if (_openAnim != null) { StopCoroutine(_openAnim); _openAnim = null; }
+        if (_panelCG != null) _openAnim = StartCoroutine(PlayOpenAnimation());
     }
 
     public void Hide()
@@ -88,11 +95,42 @@ public sealed class FsContextMenu : MonoBehaviour
 
     public bool IsOpen => _open;
 
+    // ── Open animation ────────────────────────────────────────────────────
+    // Subtle ease-out scale (0.97→1) + alpha (0→1) over 0.10 s.
+    // Uses unscaled time — safe during paused/scaled game time.
+    // No Update() — coroutine fires once per ShowAt() call.
+    private IEnumerator PlayOpenAnimation()
+    {
+        if (_panelCG == null || _panel == null) yield break;
+
+        const float Duration = 0.10f;
+        var   startScale     = new Vector3(0.97f, 0.97f, 1f);
+        float elapsed        = 0f;
+
+        _panelCG.alpha    = 0f;
+        _panel.localScale = startScale;
+
+        while (elapsed < Duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t     = Mathf.Clamp01(elapsed / Duration);
+            float eased = 1f - (1f - t) * (1f - t); // ease-out quad
+
+            _panelCG.alpha    = eased;
+            _panel.localScale = Vector3.LerpUnclamped(startScale, Vector3.one, eased);
+            yield return null;
+        }
+
+        _panelCG.alpha    = 1f;
+        _panel.localScale = Vector3.one;
+        _openAnim         = null;
+    }
+
     // ── Screen boundary clamping ──────────────────────────────────────────
     // Panel constants — must match BuildPanel() and BuildMenuItem()/BuildSeparator().
     private const float PanelWidth    = 160f;
     private const float ItemHeight    = 28f;
-    private const float SepHeight     = 5f;
+    private const float SepHeight     = 9f;
     private const float PanelPadding  = 6f;  // VLG top+bottom padding (3+3)
 
     private void ClampPanelToWindow()
@@ -181,6 +219,9 @@ public sealed class FsContextMenu : MonoBehaviour
 
         // Stops clicks on panel items from falling through to the backdrop
         go.AddComponent<ContextMenuClickBlocker>();
+        // CanvasGroup drives the open animation (alpha); blockRaycasts stays true.
+        _panelCG = go.AddComponent<CanvasGroup>();
+        _panelCG.alpha = 1f;
     }
 
     private void RebuildMenuItems()
@@ -272,7 +313,7 @@ public sealed class FsContextMenu : MonoBehaviour
         lblGO.transform.SetParent(go.transform, false);
         var rt = lblGO.GetComponent<RectTransform>();
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(10f, 0f); rt.offsetMax = new Vector2(-6f, 0f);
+        rt.offsetMin = new Vector2(28f, 0f); rt.offsetMax = new Vector2(-8f, 0f);
         var tmp   = lblGO.GetComponent<TextMeshProUGUI>();
         tmp.text          = label;
         tmp.fontSize      = 12;
@@ -289,8 +330,9 @@ public sealed class FsContextMenu : MonoBehaviour
             typeof(RectTransform), typeof(CanvasRenderer),
             typeof(Image), typeof(LayoutElement));
         go.transform.SetParent(_panel, false);
-        go.GetComponent<LayoutElement>().preferredHeight = 5f;
-        go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.08f);
+        go.GetComponent<LayoutElement>().preferredHeight = 9f;
+        // Lower opacity + slightly warmer tone — Windows-like thin separator feel
+        go.GetComponent<Image>().color = new Color(0.55f, 0.53f, 0.50f, 0.14f);
         return go;
     }
 }
@@ -318,11 +360,15 @@ internal sealed class ContextMenuClickBlocker : MonoBehaviour, IPointerClickHand
 /// <summary>Windows-style hover for context menu items.</summary>
 internal sealed class ContextMenuItemHover : MonoBehaviour,
     UnityEngine.EventSystems.IPointerEnterHandler,
-    UnityEngine.EventSystems.IPointerExitHandler
+    UnityEngine.EventSystems.IPointerExitHandler,
+    UnityEngine.EventSystems.IPointerDownHandler,
+    UnityEngine.EventSystems.IPointerUpHandler
 {
-    private static readonly Color BgHover   = new Color(0.24f, 0.44f, 0.78f, 0.22f);
+    private static readonly Color BgHover   = new Color(0.22f, 0.40f, 0.72f, 0.30f);
     private static readonly Color TxtHover  = new Color(0.95f, 0.97f, 1.00f, 1f);
     private static readonly Color TxtNormal = new Color(0.90f, 0.88f, 0.84f, 1f);
+    private static readonly Color BgPressed  = new Color(0.16f, 0.30f, 0.56f, 0.45f);
+    private static readonly Color TxtPressed = Color.white;
 
     private UnityEngine.UI.Image    _bg;
     private TMPro.TextMeshProUGUI   _lbl;
@@ -340,6 +386,19 @@ internal sealed class ContextMenuItemHover : MonoBehaviour,
     }
 
     public void OnPointerExit(UnityEngine.EventSystems.PointerEventData e) => ResetVisuals();
+
+    public void OnPointerDown(UnityEngine.EventSystems.PointerEventData e)
+    {
+        if (_bg  != null) _bg.color  = BgPressed;
+        if (_lbl != null) _lbl.color = TxtPressed;
+    }
+
+    public void OnPointerUp(UnityEngine.EventSystems.PointerEventData e)
+    {
+        // Revert to hover (pointer still over item after mouse-up)
+        if (_bg  != null) _bg.color  = BgHover;
+        if (_lbl != null) _lbl.color = TxtHover;
+    }
 
     /// <summary>FIX-3: explicit reset — called by UpdatePooledItem on reuse.</summary>
     public void ResetVisuals()

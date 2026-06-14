@@ -65,15 +65,23 @@ public static class FsAppRouter
             return;
         }
 
-        byte[]    bytes   = File.ReadAllBytes(filePath);
-        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
-        texture.filterMode = FilterMode.Bilinear;
-
-        if (!texture.LoadImage(bytes)) // LoadImage auto-resizes
+        // Cache-first: avoid redundant disk reads and Texture2D allocations
+        // when the same image is opened multiple times (e.g. Browse → Preview → Back → Preview).
+        Texture2D texture = FsTextureCache.Get(filePath);
+        if (texture == null)
         {
-            Debug.LogWarning($"[FsAppRouter] Failed to decode image: {filePath}");
-            Object.Destroy(texture);
-            return;
+            byte[] bytes = File.ReadAllBytes(filePath);
+            texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+            texture.filterMode = FilterMode.Bilinear;
+
+            if (!texture.LoadImage(bytes))
+            {
+                Debug.LogWarning($"[FsAppRouter] Failed to decode image: {filePath}");
+                Object.Destroy(texture);
+                return;
+            }
+            // Store with owned=true — cache manages lifetime of disk-loaded textures.
+            FsTextureCache.Set(filePath, texture, owned: true);
         }
 
         DesktopLauncherHub.OpenImagePreview(texture, entry.name);

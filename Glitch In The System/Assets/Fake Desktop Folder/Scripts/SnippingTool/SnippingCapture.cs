@@ -44,17 +44,42 @@ public sealed class SnippingCapture : MonoBehaviour
     // (set by background thread, consumed on main thread in LateUpdate).
     private volatile string _pendingRegistration;
 
+    // Absolute path of the screenshot to pre-register in FsTextureCache.
+    // Set by background thread alongside _pendingRegistration; consumed in LateUpdate.
+    // Using absolute path so it matches the exact key FsAppRouter uses on first open.
+    private volatile string _pendingCacheKey;
+
     private void LateUpdate()
     {
+        // Pre-register texture in cache BEFORE registering in FS manager,
+        // so the File Explorer can open it instantly from cache with zero disk read.
+        var cacheKey = _pendingCacheKey;
+        if (cacheKey != null && LastCapture != null)
+        {
+            _pendingCacheKey = null;
+            // owned: false — SnippingCapture.LastCapture lifetime is managed here
+            // (Destroy in DeleteCapture/OnDestroy). Cache must never destroy it.
+            FsTextureCache.Set(cacheKey, LastCapture, owned: false);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"[SnippingCapture] Pre-cached texture → {cacheKey}");
+#endif
+        }
+
         var pending = _pendingRegistration;
         if (pending == null) return;
         _pendingRegistration = null; // consume before registering (idempotent)
 
         var entry = FileExplorerManager.Instance?.RegisterScreenshot(pending);
+
+        // FIX: braces required so 'else' stays valid when #if block is stripped in non-editor builds.
+        // Without braces, the preprocessor leaves 'if (entry != null) <nothing> else ...' which is CS8641.
         if (entry != null)
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        {
+            FsStatusToast.ShowGlobal($"Screenshot saved — {entry.name}");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[SnippingCapture] Registered in Pictures/Screenshots: {entry.name}");
-            #endif
+#endif
+        }
         else
             Debug.LogWarning("[SnippingCapture] RegisterScreenshot: FileExplorerManager not found or folder missing.");
     }
@@ -65,6 +90,16 @@ public sealed class SnippingCapture : MonoBehaviour
         if (saveButton   != null) saveButton.onClick.AddListener(SaveCapture);
         if (deleteButton != null) deleteButton.onClick.AddListener(DeleteCapture);
         SetActionButtonsInteractable(false);
+
+        // Clear texture cache on quit so owned disk-loaded textures are destroyed cleanly.
+        // Only owned=true textures (FsAppRouter-loaded) are destroyed; LastCapture is owned=false
+        // and will be destroyed by OnDestroy below.
+        Application.quitting += OnApplicationQuitting;
+    }
+
+    private static void OnApplicationQuitting()
+    {
+        FsTextureCache.Clear();
     }
 
     // ── Public API ────────────────────────────────────────────────────────
@@ -80,9 +115,9 @@ public sealed class SnippingCapture : MonoBehaviour
 
         float scaleFactor = sourceCanvas != null ? sourceCanvas.scaleFactor : 1f;
 
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[SnippingCapture] INPUT rect=({canvasLocalRect.x:F1},{canvasLocalRect.y:F1},{canvasLocalRect.width:F1},{canvasLocalRect.height:F1})  scaleFactor={scaleFactor}  Screen={Screen.width}x{Screen.height}");
-        #endif
+#endif
 
         int screenX = Mathf.RoundToInt(canvasLocalRect.x * scaleFactor + Screen.width  * 0.5f);
         int screenY = Mathf.RoundToInt(canvasLocalRect.y * scaleFactor + Screen.height * 0.5f);
@@ -94,9 +129,9 @@ public sealed class SnippingCapture : MonoBehaviour
         capW    = Mathf.Clamp(capW, 1, Screen.width  - screenX);
         capH    = Mathf.Clamp(capH, 1, Screen.height - screenY);
 
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[SnippingCapture] CAPTURE screenX={screenX} screenY={screenY} capW={capW} capH={capH}");
-        #endif
+#endif
 
         if (capW < 1 || capH < 1)
         {
@@ -126,9 +161,9 @@ public sealed class SnippingCapture : MonoBehaviour
             }
         }
 
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[SnippingCapture] Captured {capW}x{capH} at screen ({screenX},{screenY}).");
-        #endif
+#endif
 
         // EncodeToPNG must run on the main thread (Unity API reads native texture data).
         // Do it here — this is the only encode in the entire capture pipeline.
@@ -153,6 +188,10 @@ public sealed class SnippingCapture : MonoBehaviour
                 // FileExplorerManager.RegisterScreenshot must run on the main thread.
                 // Signal LateUpdate to call it next frame.
                 _pendingRegistration = autoBaseName;
+
+                // Also signal LateUpdate to pre-register the texture in FsTextureCache.
+                // Key = absolute path matching what FsAppRouter uses as its cache key.
+                _pendingCacheKey = System.IO.Path.Combine(saveFolder, autoBaseName + ".png");
             }
             catch (System.Exception ex)
             {
@@ -183,10 +222,14 @@ public sealed class SnippingCapture : MonoBehaviour
             File.WriteAllBytes(Path.Combine(folder, baseName + ".png"), png);
 
             var entry = FileExplorerManager.Instance?.RegisterScreenshot(baseName);
+
+            // FIX: braces required so 'else' stays valid when #if block is stripped in non-editor builds.
             if (entry != null)
-                #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"[SnippingCapture] SaveCapture → registered '{entry.name}' in Pictures/Screenshots");
-                #endif
+#endif
+            }
             else
                 Debug.LogWarning("[SnippingCapture] SaveCapture — FileExplorerManager not found or folder missing.");
         }
@@ -210,9 +253,9 @@ public sealed class SnippingCapture : MonoBehaviour
         _lastPngBytes = null;
 
         SetActionButtonsInteractable(false);
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("[SnippingCapture] Capture deleted.");
-        #endif
+#endif
     }
 
     private void SetActionButtonsInteractable(bool interactable)
@@ -223,6 +266,9 @@ public sealed class SnippingCapture : MonoBehaviour
 
     private void OnDestroy()
     {
+        Application.quitting -= OnApplicationQuitting;
+        // Evict our own (unowned) cache entry so the dead texture reference is removed.
+        if (_pendingCacheKey != null) FsTextureCache.Evict(_pendingCacheKey);
         if (LastCapture != null) { Destroy(LastCapture); LastCapture = null; }
     }
 }

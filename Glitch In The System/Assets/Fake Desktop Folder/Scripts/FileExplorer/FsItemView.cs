@@ -46,8 +46,14 @@ public sealed class FsItemView : MonoBehaviour,
     // Background colors — static so one allocation serves all instances
     private static readonly Color BgNormal      = new Color(1f,    1f,    1f,    0.00f);
     private static readonly Color BgHover       = new Color(1f,    1f,    1f,    0.06f);
-    private static readonly Color BgSelected    = new Color(0.30f, 0.55f, 0.90f, 0.30f);
+    private static readonly Color BgSelected    = new Color(0.28f, 0.52f, 0.88f, 0.28f); // slightly softer blue
     private static readonly Color BgDropTarget  = new Color(0.30f, 0.70f, 0.40f, 0.30f);
+    private static readonly Color BgPressed     = new Color(1f,    1f,    1f,    0.13f); // press darkening
+    private static readonly Color BgDblFlash    = new Color(0.45f, 0.65f, 1.00f, 0.22f); // double-click flash
+
+    // Fade coroutine tracking — cancel stale fades on pool reuse
+    private System.Collections.IEnumerator _bgFadeRoutine;
+    private const float HoverFadeTime = 0.07f; // seconds
 
     private float _lastClickTime = -1f;
     private const float DblClickInterval = 0.45f; // BATCH 1: was 0.35 — 0.45 feels more like Windows
@@ -93,9 +99,12 @@ public sealed class FsItemView : MonoBehaviour,
         _entry         = entry;
         _selected      = false;
         _lastClickTime = -1f;
+        // Cancel any in-flight hover/press/flash fade so pooled rows start clean
+        if (_bgFadeRoutine != null) { StopCoroutine(_bgFadeRoutine); _bgFadeRoutine = null; }
         if (nameLabel  != null) nameLabel.text   = entry.name;
         if (dateLabel  != null) dateLabel.text   = FormatDate(entry.lastModified);
-        if (background != null) background.color = BgNormal;
+        if (background != null) { background.color = BgNormal; }
+        if (nameLabel  != null) nameLabel.color  = new Color(0.90f, 0.88f, 0.84f, 1f); // restore text color
         if (iconImage  != null)
         {
             bool hasSprite = entry.type == FileExplorerManager.EntryType.Folder
@@ -127,8 +136,14 @@ public sealed class FsItemView : MonoBehaviour,
     public void SetSelected(bool selected)
     {
         _selected = selected;
+        if (_bgFadeRoutine != null) { StopCoroutine(_bgFadeRoutine); _bgFadeRoutine = null; }
         if (background != null)
             background.color = selected ? BgSelected : BgNormal;
+        // Emphasize name text when selected
+        if (nameLabel != null)
+            nameLabel.color = selected
+                ? new Color(1f, 1f, 1f, 1f)
+                : new Color(0.90f, 0.88f, 0.84f, 1f);
     }
 
     public void RefreshName(string newName)
@@ -161,8 +176,25 @@ public sealed class FsItemView : MonoBehaviour,
     }
 
     // ── Click handling ────────────────────────────────────────────────────
-    public void OnPointerDown(PointerEventData e) { /* required by IPointerDownHandler to receive drag events */ }
-    public void OnPointerUp(PointerEventData e)   { /* paired with OnPointerDown */ }
+    public void OnPointerDown(PointerEventData e)
+    {
+        if (e.button != PointerEventData.InputButton.Left) return;
+        if (_renaming) return;
+        // Slight press darkening — not applied if a drag is already active
+        if (!_isDragging && background != null)
+            background.color = _selected
+                ? Color.Lerp(BgSelected, BgPressed, 0.4f)
+                : BgPressed;
+    }
+
+    public void OnPointerUp(PointerEventData e)
+    {
+        if (e.button != PointerEventData.InputButton.Left) return;
+        if (_renaming || _isDragging) return;
+        // Restore from press — hover or selected state
+        if (background != null)
+            background.color = _selected ? BgSelected : BgHover;
+    }
 
     public void OnPointerClick(PointerEventData e)
     {
@@ -183,25 +215,56 @@ public sealed class FsItemView : MonoBehaviour,
         bool  dbl = (now - _lastClickTime) < DblClickInterval;
         _lastClickTime = now;
 
-        if (dbl) OnDoubleClick?.Invoke(_entry);
+        if (dbl)
+        {
+            // Brief visual confirmation before open
+            if (_bgFadeRoutine != null) { StopCoroutine(_bgFadeRoutine); _bgFadeRoutine = null; }
+            _bgFadeRoutine = DblClickFlash();
+            StartCoroutine(_bgFadeRoutine);
+            OnDoubleClick?.Invoke(_entry);
+        }
         else     { SetSelected(true); OnSingleClick?.Invoke(this); }
     }
 
     public void OnPointerEnter(PointerEventData e)
     {
-        // If something is being dragged and we're a folder, show drop highlight
         if (_draggingItem != null && _draggingItem != this &&
             _entry.type == FileExplorerManager.EntryType.Folder)
         {
             if (background != null) background.color = BgDropTarget;
             return;
         }
-        if (!_selected && background != null) background.color = BgHover;
+        if (!_selected)
+            StartBgFade(BgHover, HoverFadeTime);
     }
 
     public void OnPointerExit(PointerEventData e)
     {
-        if (!_selected && background != null) background.color = BgNormal;
+        if (!_selected)
+            StartBgFade(BgNormal, HoverFadeTime);
+    }
+
+    private void StartBgFade(Color target, float duration)
+    {
+        if (_bgFadeRoutine != null) StopCoroutine(_bgFadeRoutine);
+        _bgFadeRoutine = BgFadeRoutine(target, duration);
+        StartCoroutine(_bgFadeRoutine);
+    }
+
+    private System.Collections.IEnumerator BgFadeRoutine(Color target, float duration)
+    {
+        if (background == null) yield break;
+        var start   = background.color;
+        float t     = 0f;
+        while (t < 1f)
+        {
+            t += Time.unscaledDeltaTime / duration;
+            if (background != null)
+                background.color = Color.Lerp(start, target, t);
+            yield return null;
+        }
+        if (background != null) background.color = target;
+        _bgFadeRoutine = null;
     }
 
     // ── Drag handling ─────────────────────────────────────────────────────
@@ -452,6 +515,23 @@ public sealed class FsItemView : MonoBehaviour,
         dst.offsetMin        = src.offsetMin;
         dst.offsetMax        = src.offsetMax;
         dst.SetSiblingIndex(nameLabel.transform.GetSiblingIndex());
+    }
+
+    private System.Collections.IEnumerator DblClickFlash()
+    {
+        if (background == null) yield break;
+        var original = background.color;
+        background.color = BgDblFlash;
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.unscaledDeltaTime / 0.12f;
+            if (background != null)
+                background.color = Color.Lerp(BgDblFlash, BgNormal, t);
+            yield return null;
+        }
+        if (background != null) background.color = BgNormal;
+        _bgFadeRoutine = null;
     }
 
     // ── Drop target (folders only) ────────────────────────────────────────
