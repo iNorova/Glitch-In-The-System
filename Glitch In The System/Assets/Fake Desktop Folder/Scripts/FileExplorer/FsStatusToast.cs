@@ -22,7 +22,10 @@ public sealed class FsStatusToast : MonoBehaviour
 
     public static void ShowGlobal(string message, float duration = 2.5f)
     {
-        if (_instance != null) _instance.Show(message, duration);
+        // Guard: instance exists but its GO may be inactive (window closed/minimized).
+        // StartCoroutine on an inactive GO throws — silently drop the toast.
+        if (_instance != null && _instance.gameObject.activeInHierarchy)
+            _instance.Show(message, duration);
     }
 
     // ── Queue config (UNCHANGED) ──────────────────────────────────────────
@@ -98,6 +101,8 @@ public sealed class FsStatusToast : MonoBehaviour
         _toast.SetActive(true);
 
         if (_routine != null) StopCoroutine(_routine);
+        // Safety: never call StartCoroutine on an inactive GO (throws Unity error)
+        if (!gameObject.activeInHierarchy) { _showing = false; _queue.Clear(); return; }
         _routine = StartCoroutine(ShowRoutine(dur));
     }
 

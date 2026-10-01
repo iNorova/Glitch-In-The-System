@@ -6,6 +6,7 @@ using UnityEngine;
 /// </summary>
 public static class DesktopLauncherHub
 {
+    private static SimpleAppWindow  _emailApp;
     private static SimpleAppWindow  _paintApp;
     private static SimpleAppWindow  _stickyNotesApp;
     private static SimpleAppWindow  _socialMediaApp;
@@ -20,6 +21,7 @@ public static class DesktopLauncherHub
         if (_initialized) return;
         _initialized = true;
 
+        _emailApp         = DesktopAppLocator.Find<SimpleAppWindow> ("Email",          "EmailApp");
         _paintApp         = DesktopAppLocator.Find<SimpleAppWindow> ("Paint",          "PaintApp");
         _stickyNotesApp   = DesktopAppLocator.Find<SimpleAppWindow> ("StickyNotes",    "StickyNotesApp");
         _socialMediaApp   = DesktopAppLocator.Find<SimpleAppWindow> ("SocialMedia",    "SocialMediaApp");
@@ -28,6 +30,16 @@ public static class DesktopLauncherHub
     }
 
     // ── App launchers ─────────────────────────────────────────────────────
+    public static void OpenEmailApp()
+    {
+        if (DesktopTutorialScope.IsContentModeratorOnly) return;
+
+        EnsureInitialized();
+        if (_emailApp == null)
+            _emailApp = DesktopAppLocator.Find<SimpleAppWindow>("Email", "EmailApp");
+        _emailApp?.OpenFromLauncher();
+    }
+
     public static void OpenPaintApp()
     {
         if (DesktopTutorialScope.IsContentModeratorOnly) return;

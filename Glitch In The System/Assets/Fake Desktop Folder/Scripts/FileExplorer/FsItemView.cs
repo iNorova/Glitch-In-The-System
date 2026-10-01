@@ -24,6 +24,7 @@ public sealed class FsItemView : MonoBehaviour,
     private FileExplorerManager.FsEntry _entry;
     private bool                      _selected;
     private bool                      _isDragging;
+    private bool                      _iconRtInitialized; // Batch 14: write-once icon RT guard
 
     // ── Inline rename ──────────────────────────────────────────────────────
     private TMP_InputField _inlineInput;   // built once, reused
@@ -32,7 +33,6 @@ public sealed class FsItemView : MonoBehaviour,
     private bool           _renaming;
     private bool           _renameFired;
     private int            _renameOpenFrame;
-    private UnityEngine.Events.UnityAction<string> _submitListener; // FIX-2: cached delegate
 
     // Callbacks wired by FileExplorerApp
     public Action<FsItemView>                OnSingleClick;
@@ -116,13 +116,17 @@ public sealed class FsItemView : MonoBehaviour,
                 iconImage.color           = Color.white;
                 iconImage.type            = UnityEngine.UI.Image.Type.Simple;
                 iconImage.preserveAspect  = true;
-                // Re-center RT in its 16x16 slot on every rebind (pool reuse can leave stale values)
-                var rt = iconImage.rectTransform;
-                rt.anchorMin        = new Vector2(0.5f, 0.5f);
-                rt.anchorMax        = new Vector2(0.5f, 0.5f);
-                rt.pivot            = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = Vector2.zero;
-                rt.sizeDelta        = new Vector2(16f, 16f);
+                // Batch 14: RT values never change between rebinds — write once per pool slot.
+                if (!_iconRtInitialized)
+                {
+                    var rt = iconImage.rectTransform;
+                    rt.anchorMin        = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax        = new Vector2(0.5f, 0.5f);
+                    rt.pivot            = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.sizeDelta        = new Vector2(16f, 16f);
+                    _iconRtInitialized  = true;
+                }
             }
             else
             {
@@ -363,9 +367,6 @@ public sealed class FsItemView : MonoBehaviour,
         if (nameLabel != null) nameLabel.alpha = 0f;
         _inlineInput.gameObject.SetActive(true);
 
-        // FIX-2: ensure exactly one submit listener — unsubscribe before subscribe
-        _inlineInput.onSubmit.RemoveAllListeners();
-        _inlineInput.onSubmit.AddListener(_submitListener ??= _ => SubmitInlineRename());
 
         StartCoroutine(ActivateInlineInput(_entry.name));
     }
@@ -375,8 +376,12 @@ public sealed class FsItemView : MonoBehaviour,
     {
         if (!_renaming) return;
         _renaming = false;
-        if (_inlineInput != null) _inlineInput.gameObject.SetActive(false);
-        if (nameLabel    != null) nameLabel.alpha = 1f;
+        if (_inlineInput != null)
+        {
+            _inlineInput.onEndEdit.RemoveAllListeners();
+            _inlineInput.gameObject.SetActive(false);
+        }
+        if (nameLabel != null) nameLabel.alpha = 1f;
         _renameCancel?.Invoke();
     }
 
@@ -387,38 +392,19 @@ public sealed class FsItemView : MonoBehaviour,
         _renaming    = false;
 
         string val = _inlineInput != null ? _inlineInput.text.Trim() : string.Empty;
-        if (_inlineInput != null) _inlineInput.gameObject.SetActive(false);
-        if (nameLabel    != null) nameLabel.alpha = 1f;
+        if (_inlineInput != null)
+        {
+            _inlineInput.onEndEdit.RemoveAllListeners();
+            _inlineInput.gameObject.SetActive(false);
+        }
+        if (nameLabel != null) nameLabel.alpha = 1f;
 
         if (!string.IsNullOrEmpty(val)) _renameSubmit?.Invoke(val);
         else                             _renameCancel?.Invoke();
     }
 
-    private void Update()
-    {
-        if (!_renaming) return;
-
-        // FIX-1: abort if row was disabled or input destroyed during rename
-        if (_inlineInput == null || !gameObject.activeInHierarchy)
-        {
-            _renaming    = false;
-            _renameFired = false;
-            _renameCancel?.Invoke();
-            return;
-        }
-
-        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
-        {
-            CancelInlineRename();
-            return;
-        }
-
-        // Submit on focus-loss (click outside) with 2-frame grace period
-        if (Time.frameCount <= _renameOpenFrame + 1) return;
-        bool leftHeld = Mouse.current?.leftButton.isPressed ?? false;
-        if (_inlineInput != null && !_inlineInput.isFocused && !leftHeld)
-            SubmitInlineRename();
-    }
+    // Batch 12: Update() removed — rename uses onEndEdit / wasCanceled (event-driven).
+    // OnDisable() handles mid-rename row pooling cleanup.
 
     private System.Collections.IEnumerator ActivateInlineInput(string currentName)
     {
@@ -436,6 +422,24 @@ public sealed class FsItemView : MonoBehaviour,
         }
         _inlineInput.selectionAnchorPosition = 0;
         _inlineInput.selectionFocusPosition  = selectEnd;
+
+        // Wire onEndEdit HERE (after 2-frame grace) so the activation click
+        // that opened rename cannot immediately trigger a focus-loss submit.
+        // onEndEdit fires on: Enter → Submit, Escape → Cancel, click-outside → Submit.
+        // wasCanceled is true only when Escape triggered the end-edit.
+        _inlineInput.onEndEdit.RemoveAllListeners();
+        _inlineInput.onEndEdit.AddListener(OnInlineEditEnded);
+    }
+
+    /// <summary>Batch 12: single handler for all rename end-edit events.
+    /// Replaces the three polling paths that were in Update().</summary>
+    private void OnInlineEditEnded(string _)
+    {
+        if (!_renaming) return; // already resolved (e.g. OnDisable ran first)
+        if (_inlineInput.wasCanceled)
+            CancelInlineRename();
+        else
+            SubmitInlineRename();
     }
 
     private void EnsureInlineInput()

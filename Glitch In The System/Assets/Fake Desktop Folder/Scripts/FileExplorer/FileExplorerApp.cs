@@ -346,8 +346,9 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
         var itemRT     = view.GetComponent<RectTransform>();
         if (viewportRT == null || contentRT == null || itemRT == null) return;
 
-        // Force layout to ensure anchoredPosition values are current.
-        Canvas.ForceUpdateCanvases();
+        // No forced layout rebuild here. Arrow navigation selects an already-laid-out
+        // row — positions are settled from the end-of-frame rebuild that followed the
+        // last PopulateContent() call. Forcing a rebuild per-keypress was the spike source.
 
         float contentH  = contentRT.rect.height;
         float viewportH = viewportRT.rect.height;
@@ -709,6 +710,12 @@ public sealed class FileExplorerApp : MonoBehaviour, IPointerClickHandler
             view.SetDateLabel(view.Entry.lastModified == default ? "—" : view.Entry.lastModified.ToString("dd/MM/yyyy  HH:mm"));
             _items.Add(view);
         }
+
+        // Single layout rebuild after populating all rows.
+        // Settles contentRT.rect.height + all row anchoredPositions in one pass.
+        // ScrollItemIntoView (arrow keys) then reads these values without any rebuild.
+        if (fileContent != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(fileContent);
     }
 
     private static void UpdateTypeLabel(FsItemView view, FileExplorerManager.FsEntry entry)

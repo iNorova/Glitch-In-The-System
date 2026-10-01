@@ -37,6 +37,11 @@ public sealed class FsBreadcrumb : MonoBehaviour
 
     private HorizontalLayoutGroup _hlg;
 
+    // ── Allocation caches (Batch 13) ──────────────────────────────────────
+    // Reused across Rebuild() calls — eliminates per-navigation GC allocs.
+    private readonly List<(string label, string path)> _parts   = new(8);
+    private readonly List<UnityEngine.Events.UnityAction> _actions = new(8); // cached per-slot delegates — UnityAction required by Button.onClick.AddListener
+
     // ── Init ───────────────────────────────────────────────────────────────
     private void Awake()
     {
@@ -80,19 +85,27 @@ public sealed class FsBreadcrumb : MonoBehaviour
     /// </summary>
     public void Rebuild(string fullPath, Action<string> navigateTo)
     {
-        // Parse path into segments
-        var parts = new List<(string label, string path)>();
-        parts.Add(("File Explorer", ""));
+        // Parse path into segments — reuse cached list to avoid per-nav GC alloc (Batch 13)
+        _parts.Clear();
+        _parts.Add(("File Explorer", ""));
 
         if (!string.IsNullOrEmpty(fullPath))
         {
-            string[] segs = fullPath.Trim('/').Split('/');
+            // Index-walk — avoids string[] Split() allocation (Batch 13)
+            int    start      = 0;
             string cumulative = "";
-            foreach (var seg in segs)
+            string src        = fullPath;
+            while (start < src.Length)
             {
+                while (start < src.Length && src[start] == '/') start++;
+                if (start >= src.Length) break;
+                int end = src.IndexOf('/', start);
+                if (end < 0) end = src.Length;
+                string seg = src.Substring(start, end - start);
+                start = end;
                 if (string.IsNullOrEmpty(seg)) continue;
                 cumulative += "/" + seg;
-                parts.Add((seg, cumulative));
+                _parts.Add((seg, cumulative));
             }
         }
 
@@ -100,7 +113,7 @@ public sealed class FsBreadcrumb : MonoBehaviour
         // Segments and separators are appended in correct order:
         //   seg0, sep0, seg1, sep1, ..., segN
         // They are NEVER reordered after creation.
-        while (_segments.Count < parts.Count)
+        while (_segments.Count < _parts.Count)
         {
             // If we need a sep before this new segment (all except the first)
             if (_segments.Count > 0)
@@ -108,15 +121,19 @@ public sealed class FsBreadcrumb : MonoBehaviour
             _segments.Add(BuildSegment());
         }
         // Grow seps pool if somehow behind (should not happen with the above, but be safe)
-        while (_seps.Count < parts.Count - 1)
+        while (_seps.Count < _parts.Count - 1)
             _seps.Add(BuildSeparator());
 
+        // Grow actions cache parallel to segments (Batch 13)
+        while (_actions.Count < _parts.Count)
+            _actions.Add(null);
+
         // ── Wire segments and separators (NO hierarchy changes) ─────────────
-        for (int i = 0; i < parts.Count; i++)
+        for (int i = 0; i < _parts.Count; i++)
         {
             var (lbl, btn, hover) = _segments[i];
-            var part     = parts[i];
-            bool isCurrent = (i == parts.Count - 1);
+            var part     = _parts[i];
+            bool isCurrent = (i == _parts.Count - 1);
 
             lbl.text  = part.label;
             lbl.color = isCurrent ? SegmentCurrent : SegmentNormal;
@@ -131,11 +148,17 @@ public sealed class FsBreadcrumb : MonoBehaviour
 
             hover.normalColor = isCurrent ? SegmentCurrent : SegmentNormal;
 
+            // Cache delegate per slot — only reallocate if path changed (Batch 13)
+            var targetPath = part.path;
+            int  slotIndex = i; // captured for closure identity check
+            if (_actions[i] == null || !isCurrent)
+            {
+                _actions[i] = isCurrent ? null : () => navigateTo(targetPath);
+            }
             btn.onClick.RemoveAllListeners();
             if (!isCurrent)
             {
-                var targetPath = part.path;
-                btn.onClick.AddListener(() => navigateTo(targetPath));
+                btn.onClick.AddListener(_actions[i]);
                 btn.interactable = true;
             }
             else
@@ -150,9 +173,9 @@ public sealed class FsBreadcrumb : MonoBehaviour
         }
 
         // ── Hide unused pool entries ────────────────────────────────────────
-        for (int i = parts.Count; i < _segments.Count; i++)
+        for (int i = _parts.Count; i < _segments.Count; i++)
             _segments[i].label.gameObject.SetActive(false);
-        for (int i = parts.Count - 1; i < _seps.Count; i++)
+        for (int i = _parts.Count - 1; i < _seps.Count; i++)
             _seps[i].gameObject.SetActive(false);
     }
 
